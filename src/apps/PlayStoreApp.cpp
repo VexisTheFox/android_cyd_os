@@ -1,9 +1,9 @@
 /**
  * @file PlayStoreApp.cpp
- * @brief Native Android-Style Play Store & OTA Lua App Downloader for CYD OS
+ * @brief Dynamic Cloud Play Store & OTA Lua App Downloader for CYD OS
  *
- * Connected to official cloud repository:
- *   https://github.com/VexisTheFox/cydos_appstore
+ * Dynamically fetches https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/catalog.json
+ * and caches it to LittleFS (/apps/.catalog.json) for low-RAM streaming parsing.
  */
 
 #include "PlayStoreApp.h"
@@ -20,213 +20,67 @@
 #include <WiFiClientSecure.h>
 #include <LittleFS.h>
 #include <cstring>
+#include <cstdlib>
 
 namespace apps {
 
-// =============================================================================
-// OFFICIAL CYD OS APP STORE CATALOG (https://github.com/VexisTheFox/cydos_appstore)
-// Organized by Category: Internet, Games, Media, Utilities
-// =============================================================================
+static const char* CATALOG_CLOUD_URL = "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/catalog.json";
+static const char* CATALOG_CACHE_PATH = "/apps/.catalog.json";
 
-static const StoreCatalogItem STORE_CATALOG[] = {
-    {
-        "weather", "Weather", "NET", StoreCategory::INTERNET,
-        "Open-Meteo live temp & wind",
-        "/apps/weather.lua",
-        "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/internet/weather.lua",
-        "A8AP8B/4P/x//n/+P/wAACIiREQAABEQIiAAAAAAAAA=",
-        0x0276
-    },
-    {
-        "nettools", "NetTools", "NET", StoreCategory::INTERNET,
-        "TCP Ping, WAN IP & NTP test",
-        "/apps/nettools.lua",
-        "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/internet/nettools.lua",
-        "B+AZmCJERCJ//4gRiBH//4gRiBF//0QiIkQZmAfgAAA=",
-        0x0352
-    },
-    {
-        "crypto", "CryptoTick", "NET", StoreCategory::INTERNET,
-        "Live BTC, ETH & SOL USD prices",
-        "/apps/crypto.lua",
-        "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/internet/crypto.lua",
-        "BmAGYB/wGBgYGBgwH+Af8BgYGAwYDBgYH/AGYAZgAAA=",
-        0x8400
-    },
-    {
-        "iss", "ISS Orbit", "NET", StoreCategory::INTERNET,
-        "Live ISS space radar tracker",
-        "/apps/iss.lua",
-        "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/internet/iss.lua",
-        "4AfgB+PH5+fud///7nfn5+PH4YfgB+AHA8AP8DgcAAA=",
-        0x1928
-    },
-    {
-        "wifiradar", "WiFi Radar", "NET", StoreCategory::INTERNET,
-        "Live RSSI graph & AP scanner",
-        "/apps/wifiradar.lua",
-        "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/internet/wifiradar.lua",
-        "D/A4HGAGh+EMMBAII8QGYAgQAYADwAPAAYAAAD/8AAA=",
-        0x04D3
-    },
-    {
-        "quotefetch", "TechQuotes", "NET", StoreCategory::INTERNET,
-        "Cloud wisdom & Flash bookmark",
-        "/apps/quotefetch.lua",
-        "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/internet/quotefetch.lua",
-        "P/x//sAD3DvcO8wb0CPAA9/73+PAA3/+Pn4GwAcAAAA=",
-        0x4812
-    },
-    {
-        "flappy", "Flappy CYD", "GAMES", StoreCategory::GAMES,
-        "Smooth 35 FPS arcade game",
-        "/apps/flappy.lua",
-        "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/games/flappy.lua",
-        "A/AMDBOKJE5HyEAPOBEH7wAAMAwwDDGMMYwxjP//AAA=",
-        0x1386
-    },
-    {
-        "game2048", "2048 Game", "GAMES", StoreCategory::GAMES,
-        "Classic 4x4 2048 tile puzzle",
-        "/apps/game2048.lua",
-        "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/games/game2048.lua",
-        "/n+CQbpVilW6XaJF/n8AAP5/gkGqXbpdil2CQf5/AAA=",
-        0x5180
-    },
-    {
-        "snake", "CyberSnake", "GAMES", StoreCategory::GAMES,
-        "Classic grid arcade snake",
-        "/apps/snake.lua",
-        "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/games/snake.lua",
-        "P/B/+GAYb/g/4ABwH/A/4DAAP/Af8AAwD/AP8AAMAAw=",
-        0x03E0
-    },
-    {
-        "breakout", "BrickBreak", "GAMES", StoreCategory::GAMES,
-        "Touch paddle Arkanoid arcade",
-        "/apps/breakout.lua",
-        "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/games/breakout.lua",
-        "73vvewAA93v3ewAA73sAAAGAA8ABgAAAAAAf+D/8AAA=",
-        0x9008
-    },
-    {
-        "mines", "Minesweep", "GAMES", StoreCategory::GAMES,
-        "7x7 touch Minesweeper puzzle",
-        "/apps/mines.lua",
-        "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/games/mines.lua",
-        "AYAhhBGID/Af+B24PDz8P/w/P/wf+B/4D/ARiCGEAYA=",
-        0x3186
-    },
-    {
-        "memory", "MemMatrix", "GAMES", StoreCategory::GAMES,
-        "Audio-visual memory trainer",
-        "/apps/memory.lua",
-        "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/games/memory.lua",
-        "fn5+fmZ+Zn5+fn5+AAAAAH5+fn5+Zn5mfn5+fgAAAAA=",
-        0x4010
-    },
-    {
-        "cybersynth", "CyberSynth", "MEDIA", StoreCategory::MEDIA,
-        "8-key FM synthesizer & octaves",
-        "/apps/cybersynth.lua",
-        "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/media/cybersynth.lua",
-        "f/5JkkmSSZJJkkmSSZJdul26RCJEIkQiRCJ//gAAAAA=",
-        0x4812
-    },
-    {
-        "drumseq", "BeatBox 8", "MEDIA", StoreCategory::MEDIA,
-        "4-track x 8-step drum machine",
-        "/apps/drumseq.lua",
-        "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/media/drumseq.lua",
-        "7u7u7u7uAADg4ODg4OAAAA4ODg4ODgAA7u7u7u7uAAA=",
-        0x580F
-    },
-    {
-        "rgbstudio", "RGB Studio", "MEDIA", StoreCategory::MEDIA,
-        "RGB LED & backlight controller",
-        "/apps/rgbstudio.lua",
-        "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/media/rgbstudio.lua",
-        "B+Af+D/8f/55nnGOeZ4//B/4D/AH4AfgA8AH4APAAAA=",
-        0x8010
-    },
-    {
-        "luxmeter", "LuxScope", "MEDIA", StoreCategory::MEDIA,
-        "LDR light sensor oscilloscope",
-        "/apps/luxmeter.lua",
-        "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/media/luxmeter.lua",
-        "AYAhhBAIB+AP8Bw4GBjoF+gXGBgcOA/wB+AQCCGEAYA=",
-        0x5280
-    },
-    {
-        "metronome", "Metronome", "MEDIA", StoreCategory::MEDIA,
-        "Studio BPM & time sig click",
-        "/apps/metronome.lua",
-        "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/media/metronome.lua",
-        "A8AH4AZgDDANMBiYGJgwTDDsYOZgRv////9//gAAAAA=",
-        0x3812
-    },
-    {
-        "worldclock", "WorldTime", "TOOLS", StoreCategory::UTILITIES,
-        "Multi-timezone live NTP clock",
-        "/apps/worldclock.lua",
-        "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/utilities/worldclock.lua",
-        "D/A//HAOYYbBg8GDwYPB88HzwAPAA2AGcA4//A/wAAA=",
-        0x1928
-    },
-    {
-        "stopwatch", "Stopwatch", "TOOLS", StoreCategory::UTILITIES,
-        "Precision 1/10s lap timer",
-        "/apps/stopwatch.lua",
-        "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/utilities/stopwatch.lua",
-        "B+ABgDfsf/5wDsGDwYPBg8HjwAPAA3AOf/4f+AfgAAA=",
-        0x6010
-    },
-    {
-        "pomodoro", "Pomodoro", "TOOLS", StoreCategory::UTILITIES,
-        "25m focus / 5m break timer",
-        "/apps/pomodoro.lua",
-        "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/utilities/pomodoro.lua",
-        "DbAH4B/4P/x//n5+/n/+f/7//39//n/+P/wf+AfgAAA=",
-        0x9000
-    },
-    {
-        "unitconv", "UnitConv", "TOOLS", StoreCategory::UTILITIES,
-        "Engineering unit converter",
-        "/apps/unitconv.lua",
-        "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/utilities/unitconv.lua",
-        "CAAYAD/8f/wwABAAAAAACAAYP/4//AAYAAgAAP//kkk=",
-        0x0451
-    },
-    {
-        "resistor", "OhmCalc", "TOOLS", StoreCategory::UTILITIES,
-        "4-band resistor color decoder",
-        "/apps/resistor.lua",
-        "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/utilities/resistor.lua",
-        "AAAAAAAAAAAf+D/8Ntz23/bfNtw//B/4AAAAAAAAAAA=",
-        0x4208
-    },
-    {
-        "notes", "QuickNotes", "TOOLS", StoreCategory::UTILITIES,
-        "Persistent Flash QWERTY memo",
-        "/apps/notes.lua",
-        "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/utilities/notes.lua",
-        "P/w//DAMN+wwDDfsMAw37DAMN4wwDD/8P/wAAAAAAAA=",
-        0x2C9F
-    },
-    {
-        "passgen", "PassVault", "TOOLS", StoreCategory::UTILITIES,
-        "Password & PIN key generator",
-        "/apps/passgen.lua",
-        "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/utilities/passgen.lua",
-        "B+AP8BgYGBgYGBgYf/5//n5+fD5+fn5+f/4//AAAAAA=",
-        0x0352
+// Helper to extract a JSON string field value from a single JSON object block
+static bool extractJsonField(const char* obj, const char* key, char* outBuf, size_t outMax) {
+    if (!obj || !key || !outBuf || outMax == 0) return false;
+    outBuf[0] = '\0';
+
+    char pattern[32];
+    snprintf(pattern, sizeof(pattern), "\"%s\"", key);
+    const char* p = strstr(obj, pattern);
+    if (!p) return false;
+    p += strlen(pattern);
+    while (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n' || *p == ':') p++;
+    if (*p != '"') return false;
+    p++; // skip opening quote
+
+    size_t i = 0;
+    while (*p && *p != '"' && i + 1 < outMax) {
+        if (*p == '\\' && *(p + 1) != '\0') {
+            p++;
+        }
+        outBuf[i++] = *p++;
     }
-};
+    outBuf[i] = '\0';
+    return (i > 0);
+}
 
-static constexpr int CATALOG_COUNT = sizeof(STORE_CATALOG) / sizeof(STORE_CATALOG[0]);
+static StoreCategory mapCategory(const char* catStr, char* outShort, size_t shortMax) {
+    if (!catStr) {
+        strncpy(outShort, "APP", shortMax - 1);
+        outShort[shortMax - 1] = '\0';
+        return StoreCategory::ALL;
+    }
+    if (strncasecmp(catStr, "Internet", 8) == 0 || strncasecmp(catStr, "NET", 3) == 0) {
+        strncpy(outShort, "NET", shortMax - 1);
+        outShort[shortMax - 1] = '\0';
+        return StoreCategory::INTERNET;
+    }
+    if (strncasecmp(catStr, "Game", 4) == 0) {
+        strncpy(outShort, "GAMES", shortMax - 1);
+        outShort[shortMax - 1] = '\0';
+        return StoreCategory::GAMES;
+    }
+    if (strncasecmp(catStr, "Media", 5) == 0 || strncasecmp(catStr, "Audio", 5) == 0) {
+        strncpy(outShort, "MEDIA", shortMax - 1);
+        outShort[shortMax - 1] = '\0';
+        return StoreCategory::MEDIA;
+    }
+    strncpy(outShort, "TOOLS", shortMax - 1);
+    outShort[shortMax - 1] = '\0';
+    return StoreCategory::UTILITIES;
+}
 
 PlayStoreApp::PlayStoreApp()
-    : m_activeTab(0),
+    : m_syncedThisSession(false),
+      m_activeTab(0),
       m_activeCategory(0),
       m_scrollY(0),
       m_selectedIndex(0),
@@ -249,12 +103,21 @@ PlayStoreApp::PlayStoreApp()
 
 void PlayStoreApp::onCreate() {
     m_needsFullRedraw = true;
+    loadCatalogFromCache();
 }
 
 void PlayStoreApp::onResume() {
     m_needsFullRedraw = true;
     m_needsListRedraw = true;
     m_needsFooterRedraw = true;
+
+    if (m_catalog.empty()) {
+        loadCatalogFromCache();
+    }
+    if (!m_syncedThisSession && WiFi.status() == WL_CONNECTED) {
+        m_syncedThisSession = true;
+        syncCatalogFromGitHub(false);
+    }
 }
 
 void PlayStoreApp::onUpdate() {}
@@ -264,13 +127,158 @@ void PlayStoreApp::onPause() {
     m_isDragging = false;
 }
 
-void PlayStoreApp::onDestroy() {}
+void PlayStoreApp::onDestroy() {
+    m_catalog.clear();
+    m_catalog.shrink_to_fit();
+}
+
+bool PlayStoreApp::loadCatalogFromCache() {
+    if (!StorageHAL::fileExists(CATALOG_CACHE_PATH)) {
+        return false;
+    }
+
+    File f = LittleFS.open(CATALOG_CACHE_PATH, "r");
+    if (!f) return false;
+
+    // Seek to "apps" array in catalog.json
+    bool foundAppsArray = false;
+    char window[8] = {0};
+    while (f.available()) {
+        memmove(window, window + 1, 6);
+        window[6] = (char)f.read();
+        window[7] = '\0';
+        if (strncmp(window, "\"apps\"", 6) == 0) {
+            foundAppsArray = true;
+            break;
+        }
+    }
+    if (!foundAppsArray) {
+        f.close();
+        return false;
+    }
+
+    // Advance until opening '[' of "apps": [
+    while (f.available()) {
+        char c = (char)f.read();
+        if (c == '[') break;
+    }
+
+    std::vector<StoreCatalogItem> parsed;
+    char objBuf[640];
+
+    while (f.available() && parsed.size() < 48) {
+        // Find next '{' or end of array ']'
+        char c = 0;
+        while (f.available()) {
+            c = (char)f.read();
+            if (c == '{' || c == ']') break;
+        }
+        if (c != '{') break;
+
+        size_t pos = 0;
+        objBuf[pos++] = '{';
+        int depth = 1;
+        bool inStr = false;
+        char prev = 0;
+
+        while (f.available() && depth > 0 && pos + 1 < sizeof(objBuf)) {
+            char ch = (char)f.read();
+            objBuf[pos++] = ch;
+            if (ch == '"' && prev != '\\') {
+                inStr = !inStr;
+            } else if (!inStr) {
+                if (ch == '{') depth++;
+                else if (ch == '}') depth--;
+            }
+            prev = ch;
+        }
+        objBuf[pos] = '\0';
+
+        StoreCatalogItem item;
+        memset(&item, 0, sizeof(item));
+        if (!extractJsonField(objBuf, "id", item.id, sizeof(item.id))) continue;
+        if (!extractJsonField(objBuf, "title", item.title, sizeof(item.title))) {
+            strncpy(item.title, item.id, sizeof(item.title) - 1);
+        }
+
+        char catRaw[20] = {0};
+        extractJsonField(objBuf, "category", catRaw, sizeof(catRaw));
+        item.category = mapCategory(catRaw, item.categoryName, sizeof(item.categoryName));
+
+        char badgeRaw[10] = {0};
+        if (extractJsonField(objBuf, "badge", badgeRaw, sizeof(badgeRaw))) {
+            strncpy(item.categoryName, badgeRaw, sizeof(item.categoryName) - 1);
+        }
+
+        extractJsonField(objBuf, "description", item.desc, sizeof(item.desc));
+        snprintf(item.localPath, sizeof(item.localPath), "/apps/%s.lua", item.id);
+
+        if (!extractJsonField(objBuf, "url", item.cloudUrl, sizeof(item.cloudUrl))) {
+            char relPath[48] = {0};
+            if (extractJsonField(objBuf, "path", relPath, sizeof(relPath))) {
+                snprintf(item.cloudUrl, sizeof(item.cloudUrl),
+                         "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/%s", relPath);
+            }
+        }
+
+        extractJsonField(objBuf, "icon_b64", item.iconB64, sizeof(item.iconB64));
+
+        char bgStr[12] = {0};
+        item.iconBg = 0x04D3;
+        if (extractJsonField(objBuf, "icon_bg", bgStr, sizeof(bgStr))) {
+            item.iconBg = (uint16_t)strtoul(bgStr, nullptr, 0);
+        }
+
+        parsed.push_back(item);
+    }
+
+    f.close();
+
+    if (!parsed.empty()) {
+        m_catalog.swap(parsed);
+        LOG_INFO("STORE", "Loaded %u apps from %s", (unsigned)m_catalog.size(), CATALOG_CACHE_PATH);
+        return true;
+    }
+    return false;
+}
+
+bool PlayStoreApp::syncCatalogFromGitHub(bool showToastMsg) {
+    if (WiFi.status() != WL_CONNECTED) {
+        if (showToastMsg) {
+            ui::UIManager::showToast("Connect Wi-Fi in Settings first!", 1600);
+        }
+        return false;
+    }
+
+    if (showToastMsg) {
+        ui::UIManager::showToast("Syncing GitHub App Store...", 1000);
+    }
+
+    if (downloadUrlToPath(CATALOG_CLOUD_URL, CATALOG_CACHE_PATH)) {
+        if (loadCatalogFromCache()) {
+            m_selectedIndex = 0;
+            m_scrollY = 0;
+            m_needsFullRedraw = true;
+            if (showToastMsg) {
+                char msg[44];
+                snprintf(msg, sizeof(msg), "Synced %u apps from GitHub!", (unsigned)m_catalog.size());
+                ui::UIManager::showToast(msg, 1600);
+            }
+            return true;
+        }
+    }
+
+    if (showToastMsg) {
+        ui::UIManager::showToast("GitHub Sync Failed", 1500);
+    }
+    return false;
+}
 
 int PlayStoreApp::getFilteredCount() const {
-    if (m_activeCategory == 0) return CATALOG_COUNT;
+    if (m_activeCategory == 0) return (int)m_catalog.size();
     int count = 0;
-    for (int i = 0; i < CATALOG_COUNT; i++) {
-        if ((uint8_t)STORE_CATALOG[i].category == m_activeCategory) {
+    for (size_t i = 0; i < m_catalog.size(); i++) {
+        if ((uint8_t)m_catalog[i].category == m_activeCategory) {
             count++;
         }
     }
@@ -280,12 +288,12 @@ int PlayStoreApp::getFilteredCount() const {
 int PlayStoreApp::getCatalogIndexFromFiltered(int filteredIdx) const {
     if (filteredIdx < 0) return -1;
     if (m_activeCategory == 0) {
-        return (filteredIdx < CATALOG_COUNT) ? filteredIdx : -1;
+        return (filteredIdx < (int)m_catalog.size()) ? filteredIdx : -1;
     }
     int cur = 0;
-    for (int i = 0; i < CATALOG_COUNT; i++) {
-        if ((uint8_t)STORE_CATALOG[i].category == m_activeCategory) {
-            if (cur == filteredIdx) return i;
+    for (size_t i = 0; i < m_catalog.size(); i++) {
+        if ((uint8_t)m_catalog[i].category == m_activeCategory) {
+            if (cur == filteredIdx) return (int)i;
             cur++;
         }
     }
@@ -293,8 +301,8 @@ int PlayStoreApp::getCatalogIndexFromFiltered(int filteredIdx) const {
 }
 
 bool PlayStoreApp::isInstalled(int catalogIdx) const {
-    if (catalogIdx < 0 || catalogIdx >= CATALOG_COUNT) return false;
-    return StorageHAL::fileExists(STORE_CATALOG[catalogIdx].localPath);
+    if (catalogIdx < 0 || catalogIdx >= (int)m_catalog.size()) return false;
+    return StorageHAL::fileExists(m_catalog[(size_t)catalogIdx].localPath);
 }
 
 int PlayStoreApp::getMaxScroll(int listH) const {
@@ -331,17 +339,21 @@ void PlayStoreApp::onRender(TFT_eSPI &display, int vx, int vy, int vw, int vh) {
 }
 
 void PlayStoreApp::drawHeader(TFT_eSPI &display, int vx, int vy, int vw) {
-    // 1. Top Title Bar (22px)
+    // 1. Top Title Bar (22px) + Live [SYNC] button
     display.fillRect(vx, vy, vw, 22, 0x0352);
     display.setTextFont(1);
     display.setTextDatum(TL_DATUM);
     display.setTextColor(0x07FF, 0x0352);
-    display.drawString("CYD PLAY STORE", vx + 6, vy + 7);
+    display.drawString("CYD PLAY STORE [CLOUD]", vx + 6, vy + 7);
 
+    // SYNC button in top right (rx = 176..236)
     bool wifiOk = (WiFi.status() == WL_CONNECTED);
-    display.setTextDatum(TR_DATUM);
-    display.setTextColor(wifiOk ? 0x07E0 : 0xFFE0, 0x0352);
-    display.drawString(wifiOk ? "CLOUD ONLINE" : "NO WI-FI", vx + vw - 6, vy + 7);
+    uint16_t syncBg = wifiOk ? 0x04D3 : 0x2104;
+    display.fillRoundRect(vx + vw - 62, vy + 2, 58, 18, 3, syncBg);
+    display.drawRoundRect(vx + vw - 62, vy + 2, 58, 18, 3, wifiOk ? 0x07E0 : 0xFFE0);
+    display.setTextDatum(MC_DATUM);
+    display.setTextColor(TFT_WHITE, syncBg);
+    display.drawString("SYNC GIT", vx + vw - 33, vy + 11);
 
     // 2. Main Tab Bar (22px at vy + 22)
     int tabY = vy + 22;
@@ -359,9 +371,11 @@ void PlayStoreApp::drawHeader(TFT_eSPI &display, int vx, int vy, int vw) {
         display.fillRect(vx + halfW + 6, tabY + 19, halfW - 12, 2, 0x07FF);
     }
 
+    char catTabTitle[24];
+    snprintf(catTabTitle, sizeof(catTabTitle), "CATALOG (%u)", (unsigned)getFilteredCount());
     display.setTextDatum(MC_DATUM);
     display.setTextColor((m_activeTab == 0) ? TFT_WHITE : 0x8410, t0Bg);
-    display.drawString("STORE CATALOG (24)", vx + halfW / 2, tabY + 11);
+    display.drawString(catTabTitle, vx + halfW / 2, tabY + 11);
 
     display.setTextColor((m_activeTab == 1) ? TFT_WHITE : 0x8410, t1Bg);
     display.drawString("CUSTOM URL / GIT", vx + halfW + halfW / 2, tabY + 11);
@@ -397,6 +411,18 @@ void PlayStoreApp::drawListArea(TFT_eSPI &display, int vx, int vy, int vw, int v
     int listH   = vh - HEADER_H - FOOTER_H;
     int filteredCount = getFilteredCount();
 
+    if (filteredCount == 0) {
+        display.fillRect(vx, listTop, vw, listH, 0x0821);
+        display.setTextFont(1);
+        display.setTextDatum(MC_DATUM);
+        display.setTextColor(0xFFE0, 0x0821);
+        display.drawString("Catalog not synced yet.", vx + vw / 2, listTop + listH / 2 - 12);
+        display.setTextColor(0x07FF, 0x0821);
+        display.drawString("Connect Wi-Fi & tap [SYNC GIT] at top-right!", vx + vw / 2, listTop + listH / 2 + 6);
+        display.setTextDatum(TL_DATUM);
+        return;
+    }
+
     TFT_eSprite band(&display);
     band.setColorDepth(16);
     const int BAND_H = 64;
@@ -421,7 +447,7 @@ void PlayStoreApp::drawListArea(TFT_eSPI &display, int vx, int vy, int vw, int v
             int ry = baseY + rowScreenY;
             bool sel = (fIdx == m_selectedIndex);
             bool inst = isInstalled(catIdx);
-            const StoreCatalogItem &item = STORE_CATALOG[catIdx];
+            const StoreCatalogItem &item = m_catalog[(size_t)catIdx];
 
             uint16_t cardBg = sel ? 0x1949 : 0x10A2;
             uint16_t border = sel ? 0x07FF : 0x2965;
@@ -582,7 +608,7 @@ static bool streamHttpToFile(HTTPClient& http, const char* destPath) {
                 if (len > 0) len -= c;
                 lastAct = millis();
             }
-        } else if (millis() - lastAct > 4000) {
+        } else if (millis() - lastAct > 4500) {
             break;
         }
         delay(1);
@@ -620,8 +646,8 @@ bool PlayStoreApp::downloadUrlToPath(const char* url, const char* destPath) {
 }
 
 void PlayStoreApp::installFeaturedApp(int catalogIdx) {
-    if (catalogIdx < 0 || catalogIdx >= CATALOG_COUNT) return;
-    const StoreCatalogItem &item = STORE_CATALOG[catalogIdx];
+    if (catalogIdx < 0 || catalogIdx >= (int)m_catalog.size()) return;
+    const StoreCatalogItem &item = m_catalog[(size_t)catalogIdx];
 
     if (WiFi.status() != WL_CONNECTED) {
         ui::UIManager::showToast("Connect Wi-Fi in Settings first!", 1800);
@@ -646,8 +672,8 @@ void PlayStoreApp::installFeaturedApp(int catalogIdx) {
 }
 
 void PlayStoreApp::uninstallFeaturedApp(int catalogIdx) {
-    if (catalogIdx < 0 || catalogIdx >= CATALOG_COUNT) return;
-    const StoreCatalogItem &item = STORE_CATALOG[catalogIdx];
+    if (catalogIdx < 0 || catalogIdx >= (int)m_catalog.size()) return;
+    const StoreCatalogItem &item = m_catalog[(size_t)catalogIdx];
     if (!isInstalled(catalogIdx)) return;
 
     LittleFS.remove(item.localPath);
@@ -661,12 +687,12 @@ void PlayStoreApp::uninstallFeaturedApp(int catalogIdx) {
 }
 
 void PlayStoreApp::openFeaturedApp(int catalogIdx) {
-    if (catalogIdx < 0 || catalogIdx >= CATALOG_COUNT) return;
+    if (catalogIdx < 0 || catalogIdx >= (int)m_catalog.size()) return;
     if (!isInstalled(catalogIdx)) {
         installFeaturedApp(catalogIdx);
         if (!isInstalled(catalogIdx)) return;
     }
-    const StoreCatalogItem &item = STORE_CATALOG[catalogIdx];
+    const StoreCatalogItem &item = m_catalog[(size_t)catalogIdx];
     int appIdx = core::AppRegistry::findAppIndex(item.id);
     if (appIdx < 0) appIdx = core::AppRegistry::findAppIndex(item.title);
     if (appIdx >= 0) {
@@ -721,6 +747,15 @@ void PlayStoreApp::onTouch(uint16_t x, uint16_t y, bool pressed) {
 }
 
 void PlayStoreApp::handleTap(int16_t rx, int16_t ry, int vw, int vh) {
+    // 0. Top Title Bar [SYNC GIT] Button (ry < 22, rx >= vw - 66)
+    if (ry < 22) {
+        if (rx >= vw - 66) {
+            hal::beep(25);
+            syncCatalogFromGitHub(true);
+        }
+        return;
+    }
+
     // 1. Main Tab Bar (ry = 22..43)
     if (ry >= 22 && ry < 44) {
         uint8_t newTab = (rx < vw / 2) ? 0 : 1;
@@ -746,6 +781,12 @@ void PlayStoreApp::handleTap(int16_t rx, int16_t ry, int vw, int vh) {
     }
 
     if (m_activeTab == 0) {
+        if (m_catalog.empty()) {
+            hal::beep(25);
+            syncCatalogFromGitHub(true);
+            return;
+        }
+
         // List area tap
         if (ry >= HEADER_H && ry < (vh - FOOTER_H)) {
             int docY = (ry - HEADER_H) + m_scrollY - 4;

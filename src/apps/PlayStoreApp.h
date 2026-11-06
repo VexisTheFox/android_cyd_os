@@ -1,22 +1,24 @@
 /**
  * @file PlayStoreApp.h
- * @brief Native Android-Style Play Store & OTA Lua App Downloader for CYD OS
+ * @brief Dynamic Cloud Play Store & OTA Lua App Downloader for CYD OS
  *
- * Connected to official cloud repository:
+ * Connected to live GitHub repository:
  *   https://github.com/VexisTheFox/cydos_appstore
+ *   Live manifest: https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/catalog.json
  *
  * Features:
- *   - Browse featured Lua apps organized by category (ALL, NET, GAMES, MEDIA, TOOLS)
- *   - Renders custom Base64 icons (-- @icon_b64) & custom names (-- @name)
- *   - One-tap Wi-Fi OTA download from VexisTheFox/cydos_appstore to /apps/
- *   - Custom HTTPS/HTTP URL installer with 256-byte chunked streaming to /apps/
- *   - Launch or uninstall store apps directly and sync Home Screen launcher pages
+ *   - Dynamically fetches and parses catalog.json from VexisTheFox/cydos_appstore over Wi-Fi
+ *   - Caches catalog to LittleFS (/apps/.catalog.json) so zero heap is wasted during TLS
+ *   - Category filter bar (ALL, NET, GAMES, MEDIA, TOOLS) + 1-tap [SYNC] button in header
+ *   - Renders custom 16x16 Base64 icons (-- @icon_b64) & custom names (-- @name)
+ *   - One-tap Wi-Fi OTA download of any store app to /apps/<id>.lua
  */
 
 #pragma once
 
 #include <Arduino.h>
 #include <TFT_eSPI.h>
+#include <vector>
 #include "../core/App.h"
 
 namespace apps {
@@ -30,14 +32,14 @@ enum class StoreCategory : uint8_t {
 };
 
 struct StoreCatalogItem {
-    const char*   id;
-    const char*   title;
-    const char*   categoryName;
+    char          id[20];
+    char          title[22];
+    char          categoryName[10];
     StoreCategory category;
-    const char*   desc;
-    const char*   localPath;
-    const char*   cloudUrl;
-    const char*   iconB64;
+    char          desc[36];
+    char          localPath[32];
+    char          cloudUrl[128];
+    char          iconB64[96];
     uint16_t      iconBg;
 };
 
@@ -63,10 +65,13 @@ private:
     static constexpr int FOOTER_H  = 36; // Action buttons bar at bottom
     static constexpr int ROW_H     = 42; // Height of each store app card
 
+    std::vector<StoreCatalogItem> m_catalog;
+    bool     m_syncedThisSession;
+
     uint8_t  m_activeTab;       // 0 = APP STORE CATALOG, 1 = CUSTOM URL
     uint8_t  m_activeCategory;  // 0 = ALL, 1 = NET, 2 = GAMES, 3 = MEDIA, 4 = TOOLS
     int16_t  m_scrollY;
-    int16_t  m_selectedIndex;   // Index into filtered items (or catalog)
+    int16_t  m_selectedIndex;   // Index into filtered items
     bool     m_wasPressed;
     bool     m_isDragging;
     int16_t  m_touchStartY;
@@ -81,6 +86,9 @@ private:
     char     m_customUrl[128];
     char     m_customFile[32];
     char     m_statusLine[48];
+
+    bool syncCatalogFromGitHub(bool showToastMsg);
+    bool loadCatalogFromCache();
 
     int  getFilteredCount() const;
     int  getCatalogIndexFromFiltered(int filteredIdx) const;
