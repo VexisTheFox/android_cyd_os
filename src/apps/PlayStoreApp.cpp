@@ -29,13 +29,12 @@ namespace apps {
 // =============================================================================
 
 static const StoreCatalogItem STORE_CATALOG[] = {
-    // --- Category: Internet (apps/internet/) ---
     {
         "weather", "Weather", "NET", StoreCategory::INTERNET,
         "Open-Meteo live temp & wind",
         "/apps/weather.lua",
         "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/internet/weather.lua",
-        "APDwAAw/wwAD//wAP/9VAAP1VVAPVVVUAVVVVQVVVVUFVVVVAVVVVAAAAAAAoKCgAoKCgAKCgoAAAAAAAAAAAA==",
+        "A8AP8B/4P/x//n/+P/wAACIiREQAABEQIiAAAAAAAAA=",
         0x0276
     },
     {
@@ -43,17 +42,47 @@ static const StoreCatalogItem STORE_CATALOG[] = {
         "TCP Ping, WAN IP & NTP test",
         "/apps/nettools.lua",
         "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/internet/nettools.lua",
-        "ACqoAAKBQoAIJBggIIQSCCIQBIiFV9VShB/0EpVf9VaVX/VWhB/0EoVX1VIiEASIIIQSCAgkGCACgUKAACqoAA==",
+        "B+AZmCJERCJ//4gRiBH//4gRiBF//0QiIkQZmAfgAAA=",
         0x0352
     },
-
-    // --- Category: Games (apps/games/) ---
+    {
+        "crypto", "CryptoTick", "NET", StoreCategory::INTERNET,
+        "Live BTC, ETH & SOL USD prices",
+        "/apps/crypto.lua",
+        "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/internet/crypto.lua",
+        "BmAGYB/wGBgYGBgwH+Af8BgYGAwYDBgYH/AGYAZgAAA=",
+        0x8400
+    },
+    {
+        "iss", "ISS Orbit", "NET", StoreCategory::INTERNET,
+        "Live ISS space radar tracker",
+        "/apps/iss.lua",
+        "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/internet/iss.lua",
+        "4AfgB+PH5+fud///7nfn5+PH4YfgB+AHA8AP8DgcAAA=",
+        0x1928
+    },
+    {
+        "wifiradar", "WiFi Radar", "NET", StoreCategory::INTERNET,
+        "Live RSSI graph & AP scanner",
+        "/apps/wifiradar.lua",
+        "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/internet/wifiradar.lua",
+        "D/A4HGAGh+EMMBAII8QGYAgQAYADwAPAAYAAAD/8AAA=",
+        0x04D3
+    },
+    {
+        "quotefetch", "TechQuotes", "NET", StoreCategory::INTERNET,
+        "Cloud wisdom & Flash bookmark",
+        "/apps/quotefetch.lua",
+        "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/internet/quotefetch.lua",
+        "P/x//sAD3DvcO8wb0CPAA9/73+PAA3/+Pn4GwAcAAAA=",
+        0x4812
+    },
     {
         "flappy", "Flappy CYD", "GAMES", StoreCategory::GAMES,
         "Smooth 35 FPS arcade game",
         "/apps/flappy.lua",
         "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/games/flappy.lua",
-        "AAAAAAAP/AAA//UAA//WQA9X1kANVfUADVX/qA9X/qoD//+oAP//AAAP8AAAAAAAqqqqqgAAAAAAAAAAAAAAAA==",
+        "A/AMDBOKJE5HyEAPOBEH7wAAMAwwDDGMMYwxjP//AAA=",
         0x1386
     },
     {
@@ -61,7 +90,7 @@ static const StoreCatalogItem STORE_CATALOG[] = {
         "Classic 4x4 2048 tile puzzle",
         "/apps/game2048.lua",
         "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/games/game2048.lua",
-        "P/wqqP//qqr1X6Qa8B+kGvVfpVr0D6Aa9V+gGj/8KqgqqD/8qqr//6Va9V+kCvQfpVr1X6Qa9B+lWvVfKqg//A==",
+        "/n+CQbpVilW6XaJF/n8AAP5/gkGqXbpdil2CQf5/AAA=",
         0x5180
     },
     {
@@ -69,36 +98,128 @@ static const StoreCatalogItem STORE_CATALOG[] = {
         "Classic grid arcade snake",
         "/apps/snake.lua",
         "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/games/snake.lua",
-        "AAAAAAAA//wAAP/+AAD/AAAA/wAAAP/8AAD//wAAAA/wAAAP8AAAD/AA//8AAP/+AAAAAAAAAAAAAAAAAAAAAA==",
+        "P/B/+GAYb/g/4ABwH/A/4DAAP/Af8AAwD/AP8AAMAAw=",
         0x03E0
     },
-
-    // --- Category: Media (apps/media/) ---
+    {
+        "breakout", "BrickBreak", "GAMES", StoreCategory::GAMES,
+        "Touch paddle Arkanoid arcade",
+        "/apps/breakout.lua",
+        "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/games/breakout.lua",
+        "73vvewAA93v3ewAA73sAAAGAA8ABgAAAAAAf+D/8AAA=",
+        0x9008
+    },
+    {
+        "mines", "Minesweep", "GAMES", StoreCategory::GAMES,
+        "7x7 touch Minesweeper puzzle",
+        "/apps/mines.lua",
+        "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/games/mines.lua",
+        "AYAhhBGID/Af+B24PDz8P/w/P/wf+B/4D/ARiCGEAYA=",
+        0x3186
+    },
+    {
+        "memory", "MemMatrix", "GAMES", StoreCategory::GAMES,
+        "Audio-visual memory trainer",
+        "/apps/memory.lua",
+        "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/games/memory.lua",
+        "fn5+fmZ+Zn5+fn5+AAAAAH5+fn5+Zn5mfn5+fgAAAAA=",
+        0x4010
+    },
     {
         "cybersynth", "CyberSynth", "MEDIA", StoreCategory::MEDIA,
         "8-key FM synthesizer & octaves",
         "/apps/cybersynth.lua",
         "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/media/cybersynth.lua",
-        "APAPAAMMMMD8A8A/AAAAAKqqqqpUUVFFVFFRRVRRUUVUUVFFVAFQBVUVVFVVFVRVVRVUVVUVVFWqqqqqAAAAAA==",
+        "f/5JkkmSSZJJkkmSSZJdul26RCJEIkQiRCJ//gAAAAA=",
         0x4812
     },
-
-    // --- Category: Utilities (apps/utilities/) ---
+    {
+        "drumseq", "BeatBox 8", "MEDIA", StoreCategory::MEDIA,
+        "4-track x 8-step drum machine",
+        "/apps/drumseq.lua",
+        "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/media/drumseq.lua",
+        "7u7u7u7uAADg4ODg4OAAAA4ODg4ODgAA7u7u7u7uAAA=",
+        0x580F
+    },
+    {
+        "rgbstudio", "RGB Studio", "MEDIA", StoreCategory::MEDIA,
+        "RGB LED & backlight controller",
+        "/apps/rgbstudio.lua",
+        "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/media/rgbstudio.lua",
+        "B+Af+D/8f/55nnGOeZ4//B/4D/AH4AfgA8AH4APAAAA=",
+        0x8010
+    },
+    {
+        "luxmeter", "LuxScope", "MEDIA", StoreCategory::MEDIA,
+        "LDR light sensor oscilloscope",
+        "/apps/luxmeter.lua",
+        "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/media/luxmeter.lua",
+        "AYAhhBAIB+AP8Bw4GBjoF+gXGBgcOA/wB+AQCCGEAYA=",
+        0x5280
+    },
+    {
+        "metronome", "Metronome", "MEDIA", StoreCategory::MEDIA,
+        "Studio BPM & time sig click",
+        "/apps/metronome.lua",
+        "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/media/metronome.lua",
+        "A8AH4AZgDDANMBiYGJgwTDDsYOZgRv////9//gAAAAA=",
+        0x3812
+    },
     {
         "worldclock", "WorldTime", "TOOLS", StoreCategory::UTILITIES,
         "Multi-timezone live NTP clock",
         "/apps/worldclock.lua",
         "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/utilities/worldclock.lua",
-        "ACqoAAKVVoAJQUFgJAPAGCQDwBiQA8AGkAPABpUD/xaVA/8WkAAABpAAAAYkAAAYJAFAGAlBQWAClVaAACqoAA==",
+        "D/A//HAOYYbBg8GDwYPB88HzwAPAA2AGcA4//A/wAAA=",
         0x1928
     },
     {
         "stopwatch", "Stopwatch", "TOOLS", StoreCategory::UTILITIES,
-        "Precision stopwatch & lap timer",
+        "Precision 1/10s lap timer",
         "/apps/stopwatch.lua",
         "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/utilities/stopwatch.lua",
-        "AA/wAAAP8AAA//8AAB8fAAA4BwAAcAcAAOAHAADgRwAA4EcAAOBPAADgHwAAcAcAAHAHAAD//wAAf/4AAA/wAA==",
+        "B+ABgDfsf/5wDsGDwYPBg8HjwAPAA3AOf/4f+AfgAAA=",
         0x6010
+    },
+    {
+        "pomodoro", "Pomodoro", "TOOLS", StoreCategory::UTILITIES,
+        "25m focus / 5m break timer",
+        "/apps/pomodoro.lua",
+        "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/utilities/pomodoro.lua",
+        "DbAH4B/4P/x//n5+/n/+f/7//39//n/+P/wf+AfgAAA=",
+        0x9000
+    },
+    {
+        "unitconv", "UnitConv", "TOOLS", StoreCategory::UTILITIES,
+        "Engineering unit converter",
+        "/apps/unitconv.lua",
+        "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/utilities/unitconv.lua",
+        "CAAYAD/8f/wwABAAAAAACAAYP/4//AAYAAgAAP//kkk=",
+        0x0451
+    },
+    {
+        "resistor", "OhmCalc", "TOOLS", StoreCategory::UTILITIES,
+        "4-band resistor color decoder",
+        "/apps/resistor.lua",
+        "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/utilities/resistor.lua",
+        "AAAAAAAAAAAf+D/8Ntz23/bfNtw//B/4AAAAAAAAAAA=",
+        0x4208
+    },
+    {
+        "notes", "QuickNotes", "TOOLS", StoreCategory::UTILITIES,
+        "Persistent Flash QWERTY memo",
+        "/apps/notes.lua",
+        "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/utilities/notes.lua",
+        "P/w//DAMN+wwDDfsMAw37DAMN4wwDD/8P/wAAAAAAAA=",
+        0x2C9F
+    },
+    {
+        "passgen", "PassVault", "TOOLS", StoreCategory::UTILITIES,
+        "Password & PIN key generator",
+        "/apps/passgen.lua",
+        "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/utilities/passgen.lua",
+        "B+AP8BgYGBgYGBgYf/5//n5+fD5+fn5+f/4//AAAAAA=",
+        0x0352
     }
 };
 
@@ -240,7 +361,7 @@ void PlayStoreApp::drawHeader(TFT_eSPI &display, int vx, int vy, int vw) {
 
     display.setTextDatum(MC_DATUM);
     display.setTextColor((m_activeTab == 0) ? TFT_WHITE : 0x8410, t0Bg);
-    display.drawString("STORE CATALOG (8)", vx + halfW / 2, tabY + 11);
+    display.drawString("STORE CATALOG (24)", vx + halfW / 2, tabY + 11);
 
     display.setTextColor((m_activeTab == 1) ? TFT_WHITE : 0x8410, t1Bg);
     display.drawString("CUSTOM URL / GIT", vx + halfW + halfW / 2, tabY + 11);
