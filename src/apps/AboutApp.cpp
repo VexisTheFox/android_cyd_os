@@ -96,7 +96,7 @@ void AboutApp::onRender(TFT_eSPI &display, int vx, int vy, int vw, int vh) {
         display.setTextDatum(TL_DATUM);
         display.setTextColor(COLOR_TEXT_MAIN, COLOR_BG);
         display.setTextFont(2);
-        display.drawString("CYD Android OS v1.0", vx + 38, vy + 6);
+        display.drawString("cydOS V1.0 (Stable)", vx + 38, vy + 6);
 
         display.setTextColor(COLOR_BUGDROID, COLOR_BG);
         display.setTextFont(1);

@@ -11,6 +11,8 @@
 #include "core/Config.h"
 #include "core/Logger.h"
 #include "core/TimeService.h"
+#include "core/Version.h"
+#include "core/OtaRecovery.h"
 #include "ui/KeyboardView.h"
 #include "apps/SettingsApp.h"
 #include "apps/AppManagerApp.h"
@@ -40,6 +42,10 @@ static bool s_isCustomApp                  = false;
 static bool s_isLandscape                  = false;
 static App* s_retiredApp                   = nullptr;
 static bool s_powerMenuOpen                = false;
+static bool s_updateCheckedThisBoot        = false;
+static uint32_t s_homeReadyMs              = 0;
+static bool s_updatePopupOpen              = false;
+static char s_updateAvailableTag[24]       = {0};
 uint32_t  UIManager::s_bootStartTime       = 0;
 uint32_t  UIManager::s_lastStatusUpdate    = 0;
 uint32_t  UIManager::s_toastHideTime       = 0;
@@ -297,7 +303,8 @@ void UIManager::drawLockScreen(bool fullRedraw) {
         tft.setTextFont(1);
         tft.setTextDatum(MC_DATUM);
         tft.setTextColor(0xFFE0, 0x0821);
-        tft.drawString("[DEV BUILD - LOCKED]", 120, 30);
+        tft.setTextColor(0x3EE0, 0x0821);
+        tft.drawString("SCREEN LOCKED", 120, 30);
 
         // Padlock Vector Icon at (120, 62)
         tft.drawRoundRect(111, 44, 18, 16, 6, 0x07FF);
@@ -310,7 +317,7 @@ void UIManager::drawLockScreen(bool fullRedraw) {
         tft.setTextFont(1);
         tft.setTextDatum(MC_DATUM);
         tft.setTextColor(0x07FF, 0x0821);
-        tft.drawString("CYD OS v2.0", 120, 132);
+        tft.drawString(CYDOS_FULL_NAME, 120, 132);
 
         // Compact Status Pill (Y = 156..196)
         tft.fillRoundRect(24, 156, 192, 40, 6, 0x10A2);
@@ -342,7 +349,7 @@ void UIManager::drawLockScreen(bool fullRedraw) {
         tft.setTextFont(1);
         tft.setTextDatum(TL_DATUM);
         tft.setTextColor(TFT_WHITE, 0x0821);
-        tft.drawString("ENTER PIN [DEV]", 14, 30);
+        tft.drawString("ENTER PASSCODE", 14, 30);
 
         drawLockClock();
         drawLockPinDots();
@@ -492,6 +499,71 @@ void UIManager::handleLockScreenTouch(const hal::TouchEvent& event) {
     }
 }
 
+static void drawUpdatePopup() {
+    TFT_eSPI &tft = hal::getDisplay();
+    tft.fillRoundRect(14, 52, 212, 198, 8, 0x0821);
+    tft.drawRoundRect(14, 52, 212, 198, 8, 0x07E0);
+    tft.drawRoundRect(15, 53, 210, 196, 7, 0x07FF);
+
+    // Header banner
+    tft.fillRoundRect(16, 54, 208, 30, 6, 0x0352);
+    tft.drawFastHLine(16, 84, 208, 0x07FF);
+    tft.setTextFont(2);
+    tft.setTextDatum(MC_DATUM);
+    tft.setTextColor(0x07E0, 0x0352);
+    tft.drawString("UPDATE AVAILABLE!", 120, 69);
+
+    // Version comparison card
+    tft.fillRoundRect(24, 92, 192, 54, 6, 0x10A2);
+    tft.drawRoundRect(24, 92, 192, 54, 6, 0x3186);
+
+    char curBuf[40];
+    snprintf(curBuf, sizeof(curBuf), "Installed:  cydOS %s", CYDOS_VERSION_TAG);
+    tft.setTextFont(1);
+    tft.setTextDatum(TL_DATUM);
+    tft.setTextColor(0x9CD3, 0x10A2);
+    tft.drawString(curBuf, 32, 102);
+
+    char newBuf[40];
+    snprintf(newBuf, sizeof(newBuf), "Available:  cydOS %s", s_updateAvailableTag);
+    tft.setTextFont(2);
+    tft.setTextColor(0xFFE0, 0x10A2);
+    tft.drawString(newBuf, 32, 118);
+
+    // Reminder message
+    tft.setTextFont(1);
+    tft.setTextDatum(MC_DATUM);
+    tft.setTextColor(TFT_WHITE, 0x0821);
+    tft.drawString("A new stable cydOS release is ready!", 120, 162);
+    tft.setTextColor(0x9CD3, 0x0821);
+    tft.drawString("Install over Wi-Fi via OTA Recovery?", 120, 178);
+
+    // Buttons: [ UPDATE NOW ] and [ LATER ]
+    tft.fillRoundRect(24, 198, 96, 38, 6, 0x04D3);
+    tft.drawRoundRect(24, 198, 96, 38, 6, 0x07E0);
+    tft.setTextFont(2);
+    tft.setTextColor(TFT_WHITE, 0x04D3);
+    tft.drawString("UPDATE", 72, 217);
+
+    tft.fillRoundRect(126, 198, 90, 38, 6, 0x18E3);
+    tft.drawRoundRect(126, 198, 90, 38, 6, 0x52AA);
+    tft.setTextColor(0x9CD3, 0x18E3);
+    tft.drawString("LATER", 171, 217);
+    tft.setTextDatum(TL_DATUM);
+}
+
+void UIManager::showUpdatePopup(const char* newTag) {
+    if (!newTag || newTag[0] == '\0') return;
+    strncpy(s_updateAvailableTag, newTag, sizeof(s_updateAvailableTag) - 1);
+    s_updateAvailableTag[sizeof(s_updateAvailableTag) - 1] = '\0';
+    s_updatePopupOpen = true;
+    if (s_isLandscape) setOrientation(false);
+    hal::playTone(1760, 60);
+    delay(70);
+    hal::playTone(2349, 90);
+    drawUpdatePopup();
+}
+
 static void drawPowerMenu() {
     TFT_eSPI &tft = hal::getDisplay();
     tft.fillRoundRect(16, 40, 208, 236, 8, 0x0821);
@@ -607,6 +679,7 @@ void UIManager::checkPowerAndSleep() {
             return;
         }
         if (pwrEv == hal::PowerButtonEvent::LONG_PRESS && !s_isLocked) {
+            s_updatePopupOpen = false;
             s_powerMenuOpen = !s_powerMenuOpen;
             hal::beep(55);
             if (s_powerMenuOpen) {
@@ -619,8 +692,9 @@ void UIManager::checkPowerAndSleep() {
         }
         if (pwrEv == hal::PowerButtonEvent::SHORT_PRESS) {
             hal::beep(25);
-            if (s_powerMenuOpen) {
+            if (s_powerMenuOpen || s_updatePopupOpen) {
                 s_powerMenuOpen = false;
+                s_updatePopupOpen = false;
                 render(true);
             } else {
                 lockScreen(true);
@@ -744,8 +818,9 @@ void UIManager::pump() {
 void UIManager::handleNavAction(NavAction action) {
     switch (action) {
         case NavAction::BACK:
-            if (s_powerMenuOpen) {
+            if (s_powerMenuOpen || s_updatePopupOpen) {
                 s_powerMenuOpen = false;
+                s_updatePopupOpen = false;
                 hal::beep(20);
                 render(true);
                 return;
@@ -818,6 +893,27 @@ void UIManager::routeTouchEvents() {
     // If Lock Screen is active, route all touches exclusively to Lock Screen / PIN pad
     if (s_isLocked) {
         handleLockScreenTouch(event);
+        return;
+    }
+    if (s_updatePopupOpen) {
+        if (event.state == hal::TouchState::DOWN) {
+            if (event.y >= 194 && event.y <= 242) {
+                if (event.x >= 20 && event.x <= 122) {
+                    // [ UPDATE ] -> Reboot into Cloud OTA Recovery immediately
+                    s_updatePopupOpen = false;
+                    hal::beep(50);
+                    core::OtaRecovery::triggerRebootToOtaRecovery();
+                    return;
+                }
+                if (event.x >= 124 && event.x <= 220) {
+                    // [ LATER ] -> Dismiss popup until next restart
+                    s_updatePopupOpen = false;
+                    hal::beep(25);
+                    render(true);
+                    return;
+                }
+            }
+        }
         return;
     }
     if (s_powerMenuOpen) {
@@ -1093,7 +1189,7 @@ void UIManager::render(bool forceFullRedraw) {
                 tft.setTextColor(0x3EE0, TFT_BLACK);
                 tft.setTextFont(4);
                 tft.setTextDatum(MC_DATUM);
-                tft.drawString("CYD ANDROID OS", 120, 140);
+                tft.drawString(CYDOS_FULL_NAME, 120, 140);
                 tft.setTextFont(2);
                 tft.drawString("Booting...", 120, 180);
             }
@@ -1115,7 +1211,7 @@ void UIManager::render(bool forceFullRedraw) {
             if (s_statusBarInstance) {
                 s_statusBarInstance->render(forceFullRedraw);
             }
-            if (s_powerMenuOpen) break;
+            if (s_powerMenuOpen || s_updatePopupOpen) break;
             if (s_activeApp) {
                 int16_t vpW = tft.width();
                 int16_t vpH = tft.height() - STATUS_BAR_HEIGHT - NAV_BAR_HEIGHT;
@@ -1199,8 +1295,19 @@ void UIManager::update() {
             core::AppRegistry::gc();
             if (s_retiredApp) { delete s_retiredApp; s_retiredApp = nullptr; }
             core::AppRegistry::gc();
-            if (s_powerMenuOpen) break;
+            if (s_powerMenuOpen || s_updatePopupOpen) break;
             LauncherView::update();
+            if (!s_updateCheckedThisBoot && !s_isLocked && !s_screenAsleep) {
+                if (s_homeReadyMs == 0) {
+                    s_homeReadyMs = now;
+                } else if (now - s_homeReadyMs >= 2200 && WiFi.status() == WL_CONNECTED) {
+                    s_updateCheckedThisBoot = true;
+                    char newTag[24] = {0};
+                    if (core::OtaRecovery::checkForUpdate(newTag, sizeof(newTag))) {
+                        showUpdatePopup(newTag);
+                    }
+                }
+            }
             break;
         }
 
@@ -1212,7 +1319,7 @@ void UIManager::update() {
                     s_statusBarInstance->render(false);
                 }
             }
-            if (s_powerMenuOpen) break;
+            if (s_powerMenuOpen || s_updatePopupOpen) break;
             if (s_activeApp) {
                 s_activeApp->onUpdate();
                 if (s_state == UIState::ACTIVE_APP && s_activeApp && !s_isLocked && !s_screenAsleep) {

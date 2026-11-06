@@ -21,7 +21,8 @@ enum class SettingsPage : uint8_t {
     SECURITY      = 3,
     REGION_TIME   = 4,
     SYSTEM_LOGS   = 5,
-    UPDATE_RESET  = 6
+    UPDATE_RESET  = 6,
+    ABOUT         = 7
 };
 
 class SettingsApp : public core::App {
@@ -94,6 +95,7 @@ private:
     void drawRegionTimePage(TFT_eSPI &display, int vx, int vy, int vw, int vh);
     void drawSystemLogsPage(TFT_eSPI &display, int vx, int vy, int vw, int vh);
     void drawUpdateResetPage(TFT_eSPI &display, int vx, int vy, int vw, int vh);
+    void drawAboutPage(TFT_eSPI &display, int vx, int vy, int vw, int vh);
 
     void handleTapAt(uint16_t x, uint16_t y);
     void handleMainMenuTap(uint16_t x, uint16_t y);
@@ -103,6 +105,7 @@ private:
     void handleRegionTimeTap(uint16_t x, uint16_t y);
     void handleSystemLogsTap(uint16_t x, uint16_t y);
     void handleUpdateResetTap(uint16_t x, uint16_t y);
+    void handleAboutTap(uint16_t x, uint16_t y);
 
     void connectToWifi();
     void scanWifiNetworks();

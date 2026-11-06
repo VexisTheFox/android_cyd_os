@@ -31,6 +31,15 @@ public:
      *        and reboots upon completion.
      */
     static void checkAndRunOnBoot();
+
+    /**
+     * @brief Query GitHub Releases (/releases/latest) over Wi-Fi to check if a newer
+     *        stable cydOS firmware version is available than CYDOS_VERSION_TAG.
+     * @param outLatestTag Output buffer populated with the remote tag (e.g. "v1.1")
+     * @param maxLen Size of outLatestTag buffer
+     * @return true if a newer stable release is available on GitHub
+     */
+    static bool checkForUpdate(char* outLatestTag, size_t maxLen);
 };
 
 } // namespace core

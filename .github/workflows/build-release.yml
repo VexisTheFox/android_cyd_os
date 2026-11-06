@@ -1,4 +1,4 @@
-name: Build & Release CYD OS Firmware
+name: Build & Release cydOS Firmware
 
 on:
   push:
@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: 'Optional release tag (e.g. v2.0.1). Leave empty to auto-generate on main.'
+        description: 'Optional release tag (e.g. v1.0). Leave empty to auto-generate on main.'
         required: false
         default: ''
 
@@ -27,6 +27,37 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine Release Tag & Version Metadata
+        id: meta
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+          elif [[ -n "${{ github.event.inputs.release_tag }}" ]]; then
+            TAG="${{ github.event.inputs.release_tag }}"
+          else
+            # Check if current commit is already tagged (e.g. main and tag pushed together)
+            EXISTING_TAG=$(git tag --points-at HEAD 'v*' 2>/dev/null | head -n 1)
+            if [ -n "$EXISTING_TAG" ] && [ "${{ github.ref_type }}" == "branch" ]; then
+              echo "Commit already tagged with $EXISTING_TAG; skipping duplicate branch release."
+              echo "skip_release=true" >> "$GITHUB_OUTPUT"
+              TAG="$EXISTING_TAG"
+            else
+              TAG="v1.0.${{ github.run_number }}"
+            fi
+          fi
+
+          if [ "$TAG" == "v1.0" ]; then
+            TITLE="cydOS V1.0"
+          else
+            TITLE="cydOS ${TAG}"
+          fi
+
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "title=${TITLE}" >> "$GITHUB_OUTPUT"
+          echo "Determined release: tag=${TAG}, title=${TITLE}"
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -47,11 +78,15 @@ jobs:
           pip install --upgrade platformio esptool
 
       - name: Build Firmware & LittleFS (cyd2usb - ST7789)
+        env:
+          PLATFORMIO_BUILD_FLAGS: '-DCYDOS_VERSION_TAG=\"${{ steps.meta.outputs.tag }}\"'
         run: |
           pio run -e cyd2usb
           pio run -e cyd2usb -t buildfs
 
       - name: Build Firmware (cyd2usb_ili9341 & cyd - ILI9341)
+        env:
+          PLATFORMIO_BUILD_FLAGS: '-DCYDOS_VERSION_TAG=\"${{ steps.meta.outputs.tag }}\"'
         run: |
           pio run -e cyd2usb_ili9341
           pio run -e cyd
@@ -78,7 +113,7 @@ jobs:
           # Create single merged factory images (flashable at 0x00000 via Web Flasher / esptool)
           if [ -n "$BOOT_APP0" ]; then
             esptool.py --chip esp32 merge_bin \
-              -o release_assets/CYD-OS-cyd2usb-MERGED-0x0.bin \
+              -o release_assets/cydOS-cyd2usb-MERGED-0x0.bin \
               --flash_mode dio --flash_freq 40m --flash_size 4MB \
               0x1000  .pio/build/cyd2usb/bootloader.bin \
               0x8000  .pio/build/cyd2usb/partitions.bin \
@@ -86,7 +121,7 @@ jobs:
               0x10000 .pio/build/cyd2usb/firmware.bin
 
             esptool.py --chip esp32 merge_bin \
-              -o release_assets/CYD-OS-cyd2usb_ili9341-MERGED-0x0.bin \
+              -o release_assets/cydOS-cyd2usb_ili9341-MERGED-0x0.bin \
               --flash_mode dio --flash_freq 40m --flash_size 4MB \
               0x1000  .pio/build/cyd2usb_ili9341/bootloader.bin \
               0x8000  .pio/build/cyd2usb_ili9341/partitions.bin \
@@ -94,7 +129,7 @@ jobs:
               0x10000 .pio/build/cyd2usb_ili9341/firmware.bin
 
             esptool.py --chip esp32 merge_bin \
-              -o release_assets/CYD-OS-cyd-microusb-MERGED-0x0.bin \
+              -o release_assets/cydOS-cyd-microusb-MERGED-0x0.bin \
               --flash_mode dio --flash_freq 40m --flash_size 4MB \
               0x1000  .pio/build/cyd/bootloader.bin \
               0x8000  .pio/build/cyd/partitions.bin \
@@ -112,42 +147,53 @@ jobs:
       - name: Upload Build Artifacts to Workflow Run
         uses: actions/upload-artifact@v4
         with:
-          name: cyd-os-firmware-${{ github.sha }}
+          name: cydos-firmware-${{ github.sha }}
           path: release_assets/*
 
-      - name: Determine Release Tag & Name
+      - name: Mark Previous Developer Releases as Pre-Release
         if: github.event_name != 'pull_request'
-        id: meta
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            TAG="${GITHUB_REF#refs/tags/}"
-          elif [[ -n "${{ github.event.inputs.release_tag }}" ]]; then
-            TAG="${{ github.event.inputs.release_tag }}"
-          else
-            SHORT_SHA=$(git rev-parse --short HEAD)
-            TAG="v2.0.${{ github.run_number }}-${SHORT_SHA}"
-          fi
-          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
-          echo "title=CYD Android OS ${TAG}" >> "$GITHUB_OUTPUT"
+          echo "Checking for previous non-prerelease developer releases..."
+          gh release list --limit 100 --json tagName,isPrerelease -q '.[] | select(.isPrerelease == false and (.tagName | startswith("v2.0."))) | .tagName' | while read -r rtag; do
+            if [ -n "$rtag" ]; then
+              echo "Marking legacy dev release $rtag as prerelease..."
+              gh release edit "$rtag" --prerelease || true
+            fi
+          done
 
       - name: Publish GitHub Release
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' && steps.meta.outputs.skip_release != 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.meta.outputs.tag }}
           name: ${{ steps.meta.outputs.title }}
+          prerelease: false
+          make_latest: true
           generate_release_notes: true
           body: |
-            ## CYD Android OS Automated Firmware Build (`${{ steps.meta.outputs.tag }}`)
+            ## cydOS V1.0 Official Stable Release (`${{ steps.meta.outputs.tag }}`)
+
+            Welcome to the first official stable release of **cydOS**!
+
+            ### What's New in cydOS V1.0:
+            - **Official Stable Release Transition**: Converted OS branding from dev build to cydOS V1.0 across boot splash, status bar, home launcher, lock screen, and settings.
+            - **Custom Fursona Boot Splash & Android Emblem**: High-resolution fursona boot logo with instant rendering and official "Powered by Android" footer with Bugdroid icon.
+            - **Dedicated About cydOS Page**: Full hardware, SoC, memory, active partition, uptime, and OS details in Settings with one-tap manual update checking.
+            - **Startup Update Checker & Popup**: Automatic GitHub release update check on boot when connected to Wi-Fi with interactive install modal.
+            - **Physical Recovery Trigger**: Hold physical BOOT button on startup for minimal-RAM hardware recovery.
+            - **Power & Daemon Controls**: Long-press BOOT button on Home Launcher for instant UI daemon restart, system reboot, or deep sleep power-off.
+            - **Memory Defragmentation Guard**: Smart GC and memory flush to eliminate false low-RAM warnings when switching apps.
 
             ### Quick Flash Instructions (Merged Single Binary at `0x0`)
             Use **ESP Web Flasher** or `esptool.py` to flash the single merged binary for your board at offset `0x0`:
-            - **2-USB CYD (ST7789 - Default)**: `CYD-OS-cyd2usb-MERGED-0x0.bin`
-            - **2-USB CYD (ILI9341 Inverted)**: `CYD-OS-cyd2usb_ili9341-MERGED-0x0.bin`
-            - **1-USB CYD (Micro-USB ILI9341)**: `CYD-OS-cyd-microusb-MERGED-0x0.bin`
+            - **2-USB CYD (ST7789 - Default)**: `cydOS-cyd2usb-MERGED-0x0.bin`
+            - **2-USB CYD (ILI9341 Inverted)**: `cydOS-cyd2usb_ili9341-MERGED-0x0.bin`
+            - **1-USB CYD (Micro-USB ILI9341)**: `cydOS-cyd-microusb-MERGED-0x0.bin`
 
             ```bash
-            esptool.py --chip esp32 --port COM4 write_flash 0x0 CYD-OS-cyd2usb-MERGED-0x0.bin
+            esptool.py --chip esp32 --port COM4 write_flash 0x0 cydOS-cyd2usb-MERGED-0x0.bin
             ```
           files: |
             release_assets/*

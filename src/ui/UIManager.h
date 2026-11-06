@@ -66,6 +66,7 @@ public:
     static void finishBoot();
 
     static void showToast(const char* message, uint16_t durationMs = 1500);
+    static void showUpdatePopup(const char* newTag);
     static void handleNavAction(NavAction action);
     static void pump();
 

@@ -245,7 +245,8 @@ void LauncherView::drawTopDevBanner() {
     tft.setTextFont(1);
     tft.setTextDatum(TL_DATUM);
     tft.setTextColor(0xFFE0, 0x10A2);
-    tft.drawString("CYD OS - DEVELOPMENT BUILD", VIEWPORT_X + 6, VIEWPORT_Y + 4);
+    tft.setTextColor(0x3EE0, 0x10A2);
+    tft.drawString("cydOS V1.0", VIEWPORT_X + 6, VIEWPORT_Y + 4);
 
     char pageBuf[20];
     snprintf(pageBuf, sizeof(pageBuf), "PG %u/%u", (unsigned)(s_currentPage + 1), (unsigned)getTotalPages());

@@ -169,7 +169,8 @@ void StatusBar::renderToTarget(TFT_eSPI& target, int16_t originX, int16_t origin
         target.drawString(m_clock, originX + 6, originY + 2);
 
         target.setTextColor(0xFFE0, STATUS_BG_COLOR);
-        target.drawString("DEV", originX + 54, originY + 2);
+        target.setTextColor(0x3EE0, STATUS_BG_COLOR);
+        target.drawString("cydOS", originX + 54, originY + 2);
 
         snprintf(ramBuf, sizeof(ramBuf), "RAM: %luK", (unsigned long)m_heapKb);
         target.setTextColor(STATUS_RAM_COLOR, STATUS_BG_COLOR);
@@ -187,7 +188,8 @@ void StatusBar::renderToTarget(TFT_eSPI& target, int16_t originX, int16_t origin
         target.drawString(m_clock, originX + 4, originY + 2);
 
         target.setTextColor(0xFFE0, STATUS_BG_COLOR);
-        target.drawString("DEV", originX + 44, originY + 2);
+        target.setTextColor(0x3EE0, STATUS_BG_COLOR);
+        target.drawString("V1", originX + 46, originY + 2);
 
         snprintf(ramBuf, sizeof(ramBuf), "%luK", (unsigned long)m_heapKb);
         target.setTextColor(STATUS_RAM_COLOR, STATUS_BG_COLOR);

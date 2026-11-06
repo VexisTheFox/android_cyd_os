@@ -4,6 +4,7 @@
  */
 
 #include "SettingsApp.h"
+#include "core/Version.h"
 #include "core/Logger.h"
 #include "core/TimeService.h"
 #include "core/OtaRecovery.h"
@@ -11,6 +12,7 @@
 #include "ui/UIManager.h"
 #include "ui/KeyboardView.h"
 #include <WiFi.h>
+#include <esp_ota_ops.h>
 #include <cstring>
 #include <cstdio>
 
@@ -23,6 +25,7 @@ static constexpr uint16_t COLOR_CARD_ALT  = 0x2124;
 static constexpr uint16_t COLOR_DIVIDER   = 0x3186;
 static constexpr uint16_t COLOR_CYAN      = 0x07FF;
 static constexpr uint16_t COLOR_GREEN     = 0x07E0;
+static constexpr uint16_t COLOR_ANDR_GRN  = 0x3EE0;
 static constexpr uint16_t COLOR_AMBER     = 0xFFE0;
 static constexpr uint16_t COLOR_RED       = 0xF800;
 static constexpr uint16_t COLOR_WHITE     = 0xFFFF;
@@ -93,42 +96,46 @@ void SettingsApp::onCreate() {
 }
 
 void SettingsApp::onResume() {
-    m_state           = core::AppState::RUNNING;
-    m_brightness      = Config::getInstance().getBrightness();
-    m_soundEnabled    = Config::getInstance().isSoundEnabled();
-    m_pinEnabled      = Config::getInstance().isPinEnabled();
+    m_state            = core::AppState::RUNNING;
+    m_brightness       = Config::getInstance().getBrightness();
+    m_soundEnabled     = Config::getInstance().isSoundEnabled();
+    m_pinEnabled       = Config::getInstance().isPinEnabled();
     strncpy(m_pinCode, Config::getInstance().getPinCode(), sizeof(m_pinCode) - 1);
     m_pinCode[sizeof(m_pinCode) - 1] = '\0';
-    m_wifiEnabled     = Config::getInstance().isWifiEnabled();
+    m_wifiEnabled      = Config::getInstance().isWifiEnabled();
     strncpy(m_wifiSsid, Config::getInstance().getWifiSsid(), sizeof(m_wifiSsid) - 1);
     m_wifiSsid[sizeof(m_wifiSsid) - 1] = '\0';
     strncpy(m_wifiPass, Config::getInstance().getWifiPass(), sizeof(m_wifiPass) - 1);
     m_wifiPass[sizeof(m_wifiPass) - 1] = '\0';
-    m_logInfoEnabled  = Config::getInstance().isLogInfoEnabled();
-    m_logWarnEnabled  = Config::getInstance().isLogWarnEnabled();
-    m_devModeEnabled  = Config::getInstance().isDevModeEnabled();
-    m_sleepTimeoutSec = Config::getInstance().getSleepTimeoutSec();
-    m_logsJustDeleted = false;
-    m_confirmReset    = false;
+    m_logInfoEnabled   = Config::getInstance().isLogInfoEnabled();
+    m_logWarnEnabled   = Config::getInstance().isLogWarnEnabled();
+    m_devModeEnabled   = Config::getInstance().isDevModeEnabled();
+    m_sleepTimeoutSec  = Config::getInstance().getSleepTimeoutSec();
+    m_logsJustDeleted  = false;
+    m_confirmReset     = false;
     m_isDraggingSlider = false;
-    m_wasPressed      = false;
+    m_wasPressed       = false;
     refreshCachedStatus();
     m_needsFullRedraw = true;
 }
 
 void SettingsApp::onUpdate() {
-    // Live clock update once per second when on Region & Time page
-    if (m_currentPage == SettingsPage::REGION_TIME) {
+    // Live clock / uptime tick once per second on Region & Time or About cydOS page
+    if (m_currentPage == SettingsPage::REGION_TIME || m_currentPage == SettingsPage::ABOUT) {
         uint32_t now = millis();
         if (now - m_lastClockTickMs >= 1000) {
             m_lastClockTickMs = now;
+            if (m_currentPage == SettingsPage::ABOUT) {
+                refreshCachedStatus();
+            }
             m_needsFullRedraw = true;
         }
     }
 }
 
 void SettingsApp::scrollToAbout() {
-    m_currentPage = SettingsPage::UPDATE_RESET;
+    refreshCachedStatus();
+    m_currentPage = SettingsPage::ABOUT;
     m_needsFullRedraw = true;
 }
 
@@ -282,12 +289,10 @@ void SettingsApp::drawHeader(TFT_eSPI &display, int vx, int vy, int vw) {
         display.setTextColor(COLOR_WHITE, COLOR_HEADER);
         display.drawString("Settings", vx + 8, vy + 5);
 
-        char ramBadge[24];
-        snprintf(ramBadge, sizeof(ramBadge), "RAM %luK", (unsigned long)m_cachedRamKb);
         display.setTextFont(1);
         display.setTextDatum(TR_DATUM);
-        display.setTextColor(COLOR_CYAN, COLOR_HEADER);
-        display.drawString(ramBadge, vx + vw - 8, vy + 9);
+        display.setTextColor(COLOR_ANDR_GRN, COLOR_HEADER);
+        display.drawString(CYDOS_FULL_NAME, vx + vw - 8, vy + 9);
     } else {
         // Back button pill on left
         display.fillRoundRect(vx + 4, vy + 3, 56, 20, 4, 0x2166);
@@ -305,6 +310,7 @@ void SettingsApp::drawHeader(TFT_eSPI &display, int vx, int vy, int vw) {
             case SettingsPage::REGION_TIME:   pageTitle = "Region & Time";   break;
             case SettingsPage::SYSTEM_LOGS:   pageTitle = "System & Logs";   break;
             case SettingsPage::UPDATE_RESET:  pageTitle = "Update & Reset";  break;
+            case SettingsPage::ABOUT:         pageTitle = "About cydOS";     break;
             default: break;
         }
         display.setTextFont(2);
@@ -334,6 +340,7 @@ void SettingsApp::drawMainMenu(TFT_eSPI &display, int vx, int vy, int vw, int vh
         snprintf(subSec, sizeof(subSec), "PIN Lock Enabled (%s)", m_pinCode);
     } else {
         strncpy(subSec, "Swipe / Tap Unlock Only", sizeof(subSec) - 1);
+        subSec[sizeof(subSec) - 1] = '\0';
     }
 
     char subSys[44];
@@ -341,7 +348,7 @@ void SettingsApp::drawMainMenu(TFT_eSPI &display, int vx, int vy, int vw, int vh
              (unsigned long)m_cachedRamKb,
              (unsigned long)m_cachedFlashUsedKb,
              (unsigned long)m_cachedFlashTotalKb,
-             m_devModeEnabled ? "DEV" : "STD");
+             m_devModeEnabled ? "DIAG" : "STBL");
 
     struct CatRow {
         const char* title;
@@ -350,49 +357,51 @@ void SettingsApp::drawMainMenu(TFT_eSPI &display, int vx, int vy, int vw, int vh
         const char* glyph;
     };
 
-    CatRow rows[6] = {
-        { "Wi-Fi & Network",     m_cachedWifiLine,   0x0276, "W" },
-        { "Display & Sound",     subDisplay,         0x6815, "D" },
-        { "Security & PIN Lock", subSec,             0x04D3, "S" },
-        { "Region & Date/Time",  m_cachedRegionLine, 0x2C9F, "T" },
-        { "System & Logs",       subSys,             0x9175, "M" },
-        { "OTA Update & Reset",  "GitHub Firmware OTA & Factory Wipe", 0xD8A7, "U" }
+    CatRow rows[7] = {
+        { "Wi-Fi & Network",     m_cachedWifiLine,                      0x0276, "W" },
+        { "Display & Sound",     subDisplay,                            0x6815, "D" },
+        { "Security & PIN Lock", subSec,                                0x04D3, "S" },
+        { "Region & Date/Time",  m_cachedRegionLine,                    0x2C9F, "T" },
+        { "System & Logs",       subSys,                                0x9175, "M" },
+        { "OTA Update & Reset",  "GitHub Firmware OTA & Factory Wipe",  0xD8A7, "U" },
+        { "About cydOS",         CYDOS_FULL_NAME " Stable | Hardware & Info", 0x04A0, "i" }
     };
 
-    const int rowH = 38;
-    const int gapY = 3;
-    int curY = bodyY + 4;
+    const int rowH = 33;
+    const int gapY = 2;
+    int curY = bodyY + 3;
 
-    for (int i = 0; i < 6; i++) {
-        display.fillRoundRect(vx + 6, curY, vw - 12, rowH, 6, COLOR_CARD);
-        display.drawRoundRect(vx + 6, curY, vw - 12, rowH, 6, COLOR_DIVIDER);
+    for (int i = 0; i < 7; i++) {
+        display.fillRoundRect(vx + 6, curY, vw - 12, rowH, 5, COLOR_CARD);
+        display.drawRoundRect(vx + 6, curY, vw - 12, rowH, 5,
+                              (i == 6) ? COLOR_ANDR_GRN : COLOR_DIVIDER);
 
         // Colored category icon badge
-        int bx = vx + 12;
-        int by = curY + 5;
-        display.fillRoundRect(bx, by, 28, 28, 6, rows[i].badgeCol);
-        display.drawRoundRect(bx, by, 28, 28, 6, COLOR_WHITE);
+        int bx = vx + 11;
+        int by = curY + 4;
+        display.fillRoundRect(bx, by, 25, 25, 5, rows[i].badgeCol);
+        display.drawRoundRect(bx, by, 25, 25, 5, COLOR_WHITE);
         display.setTextFont(2);
         display.setTextDatum(MC_DATUM);
         display.setTextColor(COLOR_WHITE, rows[i].badgeCol);
-        display.drawString(rows[i].glyph, bx + 14, by + 14);
+        display.drawString(rows[i].glyph, bx + 12, by + 12);
 
         // Category Title
         display.setTextDatum(TL_DATUM);
         display.setTextFont(2);
         display.setTextColor(COLOR_WHITE, COLOR_CARD);
-        display.drawString(rows[i].title, vx + 46, curY + 4);
+        display.drawString(rows[i].title, vx + 42, curY + 2);
 
         // Live Subtitle
         display.setTextFont(1);
         display.setTextColor(COLOR_MUTED, COLOR_CARD);
-        display.drawString(rows[i].sub, vx + 46, curY + 23);
+        display.drawString(rows[i].sub, vx + 42, curY + 21);
 
         // Right arrow chevron '>'
         display.setTextFont(2);
         display.setTextDatum(MC_DATUM);
         display.setTextColor(COLOR_CYAN, COLOR_CARD);
-        display.drawString(">", vx + vw - 16, curY + 19);
+        display.drawString(">", vx + vw - 15, curY + 16);
 
         curY += rowH + gapY;
     }
@@ -442,7 +451,7 @@ void SettingsApp::drawWifiPage(TFT_eSPI &display, int vx, int vy, int vw, int vh
     // Password Input Box
     display.fillRoundRect(cardX + 6, y2 + 33, cardW - 12, 24, 4, 0x0821);
     display.drawRoundRect(cardX + 6, y2 + 33, cardW - 12, 24, 4, COLOR_DIVIDER);
-    char passStr[40];
+    char passStr[48];
     if (m_wifiPass[0] == '\0') {
         strcpy(passStr, "PASS: <Open / Tap to enter>");
     } else {
@@ -769,16 +778,16 @@ void SettingsApp::drawSystemLogsPage(TFT_eSPI &display, int vx, int vy, int vw, 
     display.setTextColor(COLOR_GREEN, COLOR_CARD);
     display.drawString("Lazy App & C-Module Loader: ACTIVE", cardX + 8, y1 + 50);
 
-    // 2. Developer Mode Card (Y = bodyY + 76, H = 44)
+    // 2. Diagnostics Mode Card (Y = bodyY + 76, H = 44)
     int y2 = bodyY + 76;
     display.fillRoundRect(cardX, y2, cardW, 44, 6, COLOR_CARD);
     display.drawRoundRect(cardX, y2, cardW, 44, 6, COLOR_DIVIDER);
     display.setTextFont(2);
     display.setTextColor(COLOR_WHITE, COLOR_CARD);
-    display.drawString("Developer Mode", cardX + 8, y2 + 5);
+    display.drawString("Verbose Diagnostics", cardX + 8, y2 + 5);
     display.setTextFont(1);
     display.setTextColor(COLOR_MUTED, COLOR_CARD);
-    display.drawString("Verbose diagnostics & Lua tools", cardX + 8, y2 + 25);
+    display.drawString("Extended Lua VM & kernel logging", cardX + 8, y2 + 25);
 
     uint16_t devCol = m_devModeEnabled ? COLOR_GREEN : 0x4208;
     display.fillRoundRect(cardX + cardW - 64, y2 + 10, 56, 24, 12, devCol);
@@ -835,20 +844,20 @@ void SettingsApp::drawUpdateResetPage(TFT_eSPI &display, int vx, int vy, int vw,
     int cardX = vx + 6;
     int cardW = vw - 12;
 
-    // 1. About Device & Firmware Card (Y = bodyY + 6, H = 66)
+    // 1. Current Release Summary Card (Y = bodyY + 6, H = 66)
     int y1 = bodyY + 6;
     display.fillRoundRect(cardX, y1, cardW, 66, 6, COLOR_CARD);
     display.drawRoundRect(cardX, y1, cardW, 66, 6, COLOR_DIVIDER);
     display.setTextFont(2);
     display.setTextDatum(TL_DATUM);
-    display.setTextColor(COLOR_GREEN, COLOR_CARD);
-    display.drawString("CYD Android OS v2.0", cardX + 8, y1 + 5);
+    display.setTextColor(COLOR_ANDR_GRN, COLOR_CARD);
+    display.drawString(CYDOS_FULL_NAME " (" CYDOS_BUILD_CHANNEL ")", cardX + 8, y1 + 5);
 
     display.setTextFont(1);
     display.setTextColor(COLOR_WHITE, COLOR_CARD);
     display.drawString("Board: ESP32-2432S028 (240MHz Dual-Core)", cardX + 8, y1 + 25);
     display.setTextColor(COLOR_CYAN, COLOR_CARD);
-    display.drawString("GitHub: VexisTheFox/android_cyd_os", cardX + 8, y1 + 39);
+    display.drawString("GitHub: " CYDOS_GITHUB_REPO, cardX + 8, y1 + 39);
     display.setTextColor(COLOR_MUTED, COLOR_CARD);
     display.drawString("Recovery: Hold [BOOT] on startup", cardX + 8, y1 + 52);
 
@@ -860,13 +869,13 @@ void SettingsApp::drawUpdateResetPage(TFT_eSPI &display, int vx, int vy, int vw,
     display.drawString("CLOUD OTA FIRMWARE UPDATER", cardX + 8, y2 + 6);
     display.setTextColor(COLOR_MUTED, COLOR_CARD);
     display.drawString("Reboots into Minimal-RAM Recovery & flashes", cardX + 8, y2 + 20);
-    display.drawString("latest release from GitHub over Wi-Fi.", cardX + 8, y2 + 32);
+    display.drawString("latest stable release from GitHub over Wi-Fi.", cardX + 8, y2 + 32);
 
     display.fillRoundRect(cardX + 8, y2 + 46, cardW - 16, 26, 5, 0x0352);
     display.drawRoundRect(cardX + 8, y2 + 46, cardW - 16, 26, 5, COLOR_CYAN);
     display.setTextDatum(MC_DATUM);
     display.setTextColor(COLOR_WHITE, 0x0352);
-    display.drawString("OTA FIRMWARE UPDATE (GITHUB)", cardX + cardW / 2, y2 + 59);
+    display.drawString("INSTALL OTA UPDATE (RECOVERY)", cardX + cardW / 2, y2 + 59);
 
     // 3. Factory Reset Card (Y = bodyY + 162, H = 78)
     int y3 = bodyY + 162;
@@ -890,6 +899,115 @@ void SettingsApp::drawUpdateResetPage(TFT_eSPI &display, int vx, int vy, int vw,
     display.setTextDatum(TL_DATUM);
 }
 
+void SettingsApp::drawAboutPage(TFT_eSPI &display, int vx, int vy, int vw, int vh) {
+    int bodyY = vy + HEADER_H;
+    int bodyH = vh - HEADER_H;
+    display.fillRect(vx, bodyY, vw, bodyH, COLOR_BG);
+    int cardX = vx + 6;
+    int cardW = vw - 12;
+
+    // 1. OS Identity & Build Card (Y = bodyY + 4, H = 66)
+    int y1 = bodyY + 4;
+    display.fillRoundRect(cardX, y1, cardW, 66, 6, COLOR_CARD);
+    display.drawRoundRect(cardX, y1, cardW, 66, 6, COLOR_ANDR_GRN);
+
+    display.setTextFont(2);
+    display.setTextDatum(TL_DATUM);
+    display.setTextColor(COLOR_ANDR_GRN, COLOR_CARD);
+    display.drawString(CYDOS_FULL_NAME, cardX + 8, y1 + 4);
+
+    // STABLE pill badge
+    display.fillRoundRect(cardX + cardW - 56, y1 + 5, 48, 16, 8, COLOR_ANDR_GRN);
+    display.setTextFont(1);
+    display.setTextDatum(MC_DATUM);
+    display.setTextColor(TFT_BLACK, COLOR_ANDR_GRN);
+    display.drawString("STABLE", cardX + cardW - 32, y1 + 13);
+
+    display.setTextDatum(TL_DATUM);
+    display.setTextColor(COLOR_WHITE, COLOR_CARD);
+    display.drawString("Release: " CYDOS_VERSION_TAG " | Powered by Android", cardX + 8, y1 + 24);
+    display.setTextColor(COLOR_CYAN, COLOR_CARD);
+    display.drawString("Author: " CYDOS_AUTHOR " | Lua 5.4.6 VM", cardX + 8, y1 + 38);
+    display.setTextColor(COLOR_MUTED, COLOR_CARD);
+    display.drawString("Repo: " CYDOS_GITHUB_REPO, cardX + 8, y1 + 51);
+
+    // 2. Hardware Specifications Card (Y = bodyY + 74, H = 66)
+    int y2 = bodyY + 74;
+    display.fillRoundRect(cardX, y2, cardW, 66, 6, COLOR_CARD);
+    display.drawRoundRect(cardX, y2, cardW, 66, 6, COLOR_DIVIDER);
+    display.setTextColor(COLOR_CYAN, COLOR_CARD);
+    display.drawString("HARDWARE SPECIFICATIONS", cardX + 8, y2 + 5);
+
+    display.setTextColor(COLOR_WHITE, COLOR_CARD);
+    display.drawString("Board: ESP32-2432S028 (CYD 2-USB)", cardX + 8, y2 + 19);
+
+    char cpuLine[40];
+    snprintf(cpuLine, sizeof(cpuLine), "SoC: Xtensa Dual-Core LX6 @ %luMHz",
+             (unsigned long)ESP.getCpuFreqMHz());
+    display.drawString(cpuLine, cardX + 8, y2 + 31);
+
+    display.setTextColor(COLOR_MUTED, COLOR_CARD);
+    display.drawString("LCD: 2.8\" TFT 240x320 | Touch: XPT2046", cardX + 8, y2 + 43);
+    display.drawString("Flash: 4MB DIO | Audio: PWM Piezo", cardX + 8, y2 + 54);
+
+    // 3. System, OTA Partition & Live Telemetry Card (Y = bodyY + 144, H = 66)
+    int y3 = bodyY + 144;
+    display.fillRoundRect(cardX, y3, cardW, 66, 6, COLOR_CARD);
+    display.drawRoundRect(cardX, y3, cardW, 66, 6, COLOR_DIVIDER);
+    display.setTextColor(COLOR_CYAN, COLOR_CARD);
+    display.drawString("SYSTEM & PARTITION TELEMETRY", cardX + 8, y3 + 5);
+
+    const esp_partition_t* running = esp_ota_get_running_partition();
+    char partLine[40];
+    if (running) {
+        snprintf(partLine, sizeof(partLine), "OTA Slot: %.6s (0x%lX) | Auto-Upd",
+                 running->label, (unsigned long)running->address);
+    } else {
+        strncpy(partLine, "OTA Slot: app0 (0x10000) | Auto-Upd", sizeof(partLine) - 1);
+        partLine[sizeof(partLine) - 1] = '\0';
+    }
+    display.setTextColor(COLOR_WHITE, COLOR_CARD);
+    display.drawString(partLine, cardX + 8, y3 + 19);
+
+    char memLine[40];
+    snprintf(memLine, sizeof(memLine), "RAM: %luKB Free | FS: %lu/%luKB",
+             (unsigned long)m_cachedRamKb,
+             (unsigned long)m_cachedFlashUsedKb,
+             (unsigned long)m_cachedFlashTotalKb);
+    display.drawString(memLine, cardX + 8, y3 + 31);
+
+    uint32_t upSec = millis() / 1000UL;
+    uint32_t upHr  = upSec / 3600UL;
+    uint32_t upMin = (upSec % 3600UL) / 60UL;
+    uint32_t upRem = upSec % 60UL;
+    char netLine[40];
+    if (m_cachedWifiConn) {
+        snprintf(netLine, sizeof(netLine), "Up: %luh %02lum %02lus | IP: %.15s",
+                 (unsigned long)upHr, (unsigned long)upMin, (unsigned long)upRem,
+                 WiFi.localIP().toString().c_str());
+    } else {
+        snprintf(netLine, sizeof(netLine), "Up: %luh %02lum %02lus | Wi-Fi: Offline",
+                 (unsigned long)upHr, (unsigned long)upMin, (unsigned long)upRem);
+    }
+    display.setTextColor(COLOR_MUTED, COLOR_CARD);
+    display.drawString(netLine, cardX + 8, y3 + 43);
+
+    char sdkLine[40];
+    snprintf(sdkLine, sizeof(sdkLine), "ESP-IDF: %.14s | SD: %s",
+             ESP.getSdkVersion(), StorageHAL::isSDMounted() ? "Mounted" : "None");
+    display.setTextColor(COLOR_ANDR_GRN, COLOR_CARD);
+    display.drawString(sdkLine, cardX + 8, y3 + 54);
+
+    // 4. Check For Updates Action Button (Y = bodyY + 214, H = 28)
+    int y4 = bodyY + 214;
+    display.fillRoundRect(cardX, y4, cardW, 28, 5, 0x0352);
+    display.drawRoundRect(cardX, y4, cardW, 28, 5, COLOR_ANDR_GRN);
+    display.setTextDatum(MC_DATUM);
+    display.setTextColor(COLOR_WHITE, 0x0352);
+    display.drawString("CHECK FOR UPDATES NOW", cardX + cardW / 2, y4 + 14);
+    display.setTextDatum(TL_DATUM);
+}
+
 void SettingsApp::onRender(TFT_eSPI &display, int vx, int vy, int vw, int vh) {
     if (!m_needsFullRedraw) return;
     m_needsFullRedraw = false;
@@ -903,6 +1021,7 @@ void SettingsApp::onRender(TFT_eSPI &display, int vx, int vy, int vw, int vh) {
         case SettingsPage::REGION_TIME:   drawRegionTimePage(display, vx, vy, vw, vh); break;
         case SettingsPage::SYSTEM_LOGS:   drawSystemLogsPage(display, vx, vy, vw, vh); break;
         case SettingsPage::UPDATE_RESET:  drawUpdateResetPage(display, vx, vy, vw, vh); break;
+        case SettingsPage::ABOUT:         drawAboutPage(display, vx, vy, vw, vh); break;
     }
 }
 
@@ -912,10 +1031,10 @@ void SettingsApp::onRender(TFT_eSPI &display, int vx, int vy, int vw, int vh) {
 
 void SettingsApp::handleMainMenuTap(uint16_t x, uint16_t y) {
     (void)x;
-    int relY = (int)y - HEADER_H - 4;
+    int relY = (int)y - HEADER_H - 3;
     if (relY < 0) return;
-    int idx = relY / 41; // rowH (38) + gapY (3)
-    if (idx < 0 || idx >= 6) return;
+    int idx = relY / 35; // rowH (33) + gapY (2)
+    if (idx < 0 || idx >= 7) return;
 
     hal::beep(25);
     switch (idx) {
@@ -925,6 +1044,7 @@ void SettingsApp::handleMainMenuTap(uint16_t x, uint16_t y) {
         case 3: openPage(SettingsPage::REGION_TIME);   break;
         case 4: openPage(SettingsPage::SYSTEM_LOGS);   break;
         case 5: openPage(SettingsPage::UPDATE_RESET);  break;
+        case 6: openPage(SettingsPage::ABOUT);         break;
     }
 }
 
@@ -1176,7 +1296,7 @@ void SettingsApp::handleRegionTimeTap(uint16_t x, uint16_t y) {
 void SettingsApp::handleSystemLogsTap(uint16_t x, uint16_t y) {
     int relY = (int)y - HEADER_H;
 
-    // 1. Developer Mode toggle (relY = 76..120)
+    // 1. Verbose Diagnostics toggle (relY = 76..120)
     if (relY >= 76 && relY <= 120) {
         m_devModeEnabled = !m_devModeEnabled;
         Config::getInstance().setDevModeEnabled(m_devModeEnabled, true);
@@ -1245,6 +1365,40 @@ void SettingsApp::handleUpdateResetTap(uint16_t x, uint16_t y) {
     }
 }
 
+void SettingsApp::handleAboutTap(uint16_t x, uint16_t y) {
+    (void)x;
+    int relY = (int)y - HEADER_H;
+
+    // Check For Updates Now button (relY = 212..246)
+    if (relY >= 212 && relY <= 246) {
+        hal::beep(35);
+        if (WiFi.status() != WL_CONNECTED) {
+            ui::UIManager::showToast("Connect Wi-Fi first to check updates!", 1600);
+            return;
+        }
+
+        // Immediate button feedback while querying GitHub over TLS
+        TFT_eSPI& d = hal::getDisplay();
+        int btnY = 20 + HEADER_H + 214;
+        d.fillRoundRect(6, btnY, 228, 28, 5, 0x2166);
+        d.drawRoundRect(6, btnY, 228, 28, 5, COLOR_CYAN);
+        d.setTextFont(1);
+        d.setTextDatum(MC_DATUM);
+        d.setTextColor(COLOR_CYAN, 0x2166);
+        d.drawString("CHECKING GITHUB RELEASES...", 120, btnY + 14);
+        d.setTextDatum(TL_DATUM);
+
+        char newTag[24] = {0};
+        if (core::OtaRecovery::checkForUpdate(newTag, sizeof(newTag))) {
+            m_needsFullRedraw = true;
+            ui::UIManager::showUpdatePopup(newTag);
+        } else {
+            m_needsFullRedraw = true;
+            ui::UIManager::showToast(CYDOS_FULL_NAME " is up to date!", 1800);
+        }
+    }
+}
+
 void SettingsApp::handleTapAt(uint16_t x, uint16_t y) {
     // Top Header Bar
     if (y < HEADER_H) {
@@ -1263,6 +1417,7 @@ void SettingsApp::handleTapAt(uint16_t x, uint16_t y) {
         case SettingsPage::REGION_TIME:   handleRegionTimeTap(x, y);   break;
         case SettingsPage::SYSTEM_LOGS:   handleSystemLogsTap(x, y);   break;
         case SettingsPage::UPDATE_RESET:  handleUpdateResetTap(x, y);  break;
+        case SettingsPage::ABOUT:         handleAboutTap(x, y);        break;
     }
 }
 

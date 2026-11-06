@@ -4,6 +4,7 @@
  */
 
 #include "OtaRecovery.h"
+#include "Version.h"
 #include "Config.h"
 #include "../hal/DisplayHAL.h"
 #include "../hal/BoardHAL.h"
@@ -309,6 +310,97 @@ void OtaRecovery::checkAndRunOnBoot() {
         delay(3500);
     }
     ESP.restart();
+}
+
+static void parseSemVer(const char* tag, int &maj, int &min, int &pat) {
+    maj = 0; min = 0; pat = 0;
+    if (!tag) return;
+    const char* p = tag;
+    if (*p == 'v' || *p == 'V') p++;
+    maj = atoi(p);
+    const char* d1 = strchr(p, '.');
+    if (d1) {
+        min = atoi(d1 + 1);
+        const char* d2 = strchr(d1 + 1, '.');
+        if (d2) {
+            pat = atoi(d2 + 1);
+        }
+    }
+}
+
+bool OtaRecovery::checkForUpdate(char* outLatestTag, size_t maxLen) {
+    if (outLatestTag && maxLen > 0) {
+        outLatestTag[0] = '\0';
+    }
+    if (WiFi.status() != WL_CONNECTED) {
+        return false;
+    }
+
+    char foundTag[32] = {0};
+    {
+        // Declare WiFiClientSecure BEFORE HTTPClient so HTTPClient destructor runs first!
+        WiFiClientSecure client;
+        client.setInsecure();
+
+        HTTPClient http;
+        http.setConnectTimeout(4500);
+        http.setTimeout(5000);
+        http.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
+        const char* hdrKeys[] = { "Location" };
+        http.collectHeaders(hdrKeys, 1);
+
+        if (http.begin(client, "https://github.com/" CYDOS_GITHUB_REPO "/releases/latest")) {
+            int code = http.GET();
+            if (code == 301 || code == 302 || code == 303 || code == 307 || code == 308) {
+                String loc = http.getLocation();
+                if (loc.length() == 0) {
+                    loc = http.header("Location");
+                }
+                const char* marker = "/releases/tag/";
+                const char* pos = strstr(loc.c_str(), marker);
+                if (pos) {
+                    pos += strlen(marker);
+                    size_t i = 0;
+                    while (pos[i] != '\0' && pos[i] != '?' && pos[i] != '#' && pos[i] != '/' && i + 1 < sizeof(foundTag)) {
+                        foundTag[i] = pos[i];
+                        i++;
+                    }
+                    foundTag[i] = '\0';
+                }
+            }
+            http.end();
+        }
+    }
+
+    if (foundTag[0] == '\0') {
+        return false;
+    }
+
+    // Ignore legacy pre-stable engineering tags (e.g. v2.0.11-d34f8c4)
+    if (strncasecmp(foundTag, "v2.0.", 5) == 0 && strchr(foundTag, '-') != nullptr) {
+        return false;
+    }
+
+    if (strcasecmp(foundTag, CYDOS_VERSION_TAG) == 0) {
+        return false;
+    }
+
+    int curMaj = 0, curMin = 0, curPat = 0;
+    int remMaj = 0, remMin = 0, remPat = 0;
+    parseSemVer(CYDOS_VERSION_TAG, curMaj, curMin, curPat);
+    parseSemVer(foundTag, remMaj, remMin, remPat);
+
+    bool newer = false;
+    if (remMaj != curMaj)      newer = (remMaj > curMaj);
+    else if (remMin != curMin) newer = (remMin > curMin);
+    else if (remPat != curPat) newer = (remPat > curPat);
+    else                       newer = true; // Different suffix on same base version
+
+    if (newer && outLatestTag && maxLen > 0) {
+        strncpy(outLatestTag, foundTag, maxLen - 1);
+        outLatestTag[maxLen - 1] = '\0';
+    }
+    return newer;
 }
 
 } // namespace core
