@@ -7,6 +7,7 @@
 #include "hal/BoardHAL.h"
 #include "core/AppRegistry.h"
 #include "core/Config.h"
+#include "core/LuaIconCodec.h"
 #include "apps/WallpaperApp.h"
 
 namespace ui {
@@ -81,6 +82,7 @@ void LauncherView::prevPage() {
 static AppID mapDescriptorToGlyphId(const core::AppDescriptor* desc) {
     if (!desc) return AppID::TERMINAL;
     if (strcasecmp(desc->name, "Settings") == 0 || strcasecmp(desc->id, "settings") == 0) return AppID::SETTINGS;
+    if (strcasecmp(desc->name, "Play Store") == 0 || strcasecmp(desc->id, "playstore") == 0) return AppID::PLAY_STORE;
     if (strcasecmp(desc->name, "App Mgr") == 0 || strcasecmp(desc->id, "appmgr") == 0) return AppID::APP_MANAGER;
     if (strcasecmp(desc->name, "Wallpapers") == 0 || strcasecmp(desc->id, "wallpapers") == 0) return AppID::WALLPAPERS;
     if (strcasecmp(desc->name, "About") == 0 || strcasecmp(desc->id, "about") == 0) return AppID::ABOUT;
@@ -359,7 +361,14 @@ void LauncherView::drawAppIcon(uint8_t slotIndex, bool pressed) {
         tft.drawRoundRect(iconX, iconY, ICON_SIZE, ICON_SIZE, ICON_RADIUS, 0x4A69);
     }
 
-    drawIconGlyph(app.id, cx, cy, app.iconFgColor);
+    // Check if Lua script has a custom Base64 logo (-- @icon_b64 or _APP_ICON_B64)
+    bool drewCustomLogo = false;
+    if (app.subtitle && app.subtitle[0] != '\0') {
+        drewCustomLogo = core::LuaIconCodec::drawCustomScriptIcon(tft, app.subtitle, cx, cy, app.iconFgColor, 2);
+    }
+    if (!drewCustomLogo) {
+        drawIconGlyph(app.id, cx, cy, app.iconFgColor);
+    }
 
     int16_t labelY = iconY + ICON_SIZE + 4;
     tft.setTextFont(1);
@@ -373,6 +382,7 @@ void LauncherView::drawAppIcon(uint8_t slotIndex, bool pressed) {
 void LauncherView::drawIconGlyph(AppID id, int16_t cx, int16_t cy, uint16_t fgColor) {
     switch (id) {
         case AppID::SETTINGS:    drawSettingsGlyph(cx, cy, fgColor);   break;
+        case AppID::PLAY_STORE:  drawPlayStoreGlyph(cx, cy, fgColor);  break;
         case AppID::APP_MANAGER: drawAppManagerGlyph(cx, cy, fgColor); break;
         case AppID::WALLPAPERS:  drawWallpapersGlyph(cx, cy, fgColor); break;
         case AppID::ABOUT:       drawAboutGlyph(cx, cy, fgColor);      break;
@@ -385,6 +395,19 @@ void LauncherView::drawIconGlyph(AppID id, int16_t cx, int16_t cy, uint16_t fgCo
         case AppID::TERMINAL:    drawTerminalGlyph(cx, cy, fgColor);   break;
         default:                 drawTerminalGlyph(cx, cy, fgColor);   break;
     }
+}
+
+void LauncherView::drawPlayStoreGlyph(int16_t cx, int16_t cy, uint16_t fgColor) {
+    (void)fgColor;
+    TFT_eSPI &tft = hal::getDisplay();
+    // Colorful 4-quadrant Google Play prism triangle
+    tft.fillTriangle(cx - 10, cy - 13, cx - 10, cy + 13, cx + 2,  cy,      0x07FF); // Left Cyan
+    tft.fillTriangle(cx - 10, cy - 13, cx + 5,  cy - 4,  cx,      cy,      0x07E0); // Top Green
+    tft.fillTriangle(cx - 10, cy + 13, cx + 5,  cy + 4,  cx,      cy,      0xF800); // Bottom Red/Coral
+    tft.fillTriangle(cx,      cy,      cx + 5,  cy - 4,  cx + 12, cy,      0xFFE0); // Right Tip Gold Top
+    tft.fillTriangle(cx,      cy,      cx + 5,  cy + 4,  cx + 12, cy,      0xFD20); // Right Tip Gold Bottom
+    tft.drawLine(cx - 10, cy - 13, cx + 5, cy + 4, TFT_WHITE);
+    tft.drawLine(cx - 10, cy + 13, cx + 5, cy - 4, TFT_WHITE);
 }
 
 void LauncherView::drawSettingsGlyph(int16_t cx, int16_t cy, uint16_t fgColor) {

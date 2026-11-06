@@ -280,6 +280,8 @@ void SU7App::drawFrame(TFT_eSPI &display, int vx, int vy, int vw, int vh) {
     float cx = (float)vx + ((float)vw * 0.5f);
     float cy = (float)vy + ((float)vh * 0.5f) + 4.0f;
 
+    Point2D proj[NUM_SU7_VERTICES];
+
     for (uint16_t i = 0; i < NUM_SU7_VERTICES; i++) {
         const Point3D& v = SU7_VERTICES[i];
         float xRot = v.x * cosYaw - v.y * sinYaw;
@@ -293,11 +295,11 @@ void SU7App::drawFrame(TFT_eSPI &display, int vx, int vy, int vw, int vh) {
         float zDepth = CAM_DIST + yCam;
         if (zDepth > 0.5f) {
             float invZ = FOCAL / zDepth;
-            m_proj[i].x = (int16_t)(cx + xCam * invZ);
-            m_proj[i].y = (int16_t)(cy - zCam * invZ);
-            m_proj[i].visible = true;
+            proj[i].x = (int16_t)(cx + xCam * invZ);
+            proj[i].y = (int16_t)(cy - zCam * invZ);
+            proj[i].visible = true;
         } else {
-            m_proj[i].visible = false;
+            proj[i].visible = false;
         }
     }
 
@@ -309,8 +311,8 @@ void SU7App::drawFrame(TFT_eSPI &display, int vx, int vy, int vw, int vh) {
 
     for (uint16_t i = 0; i < NUM_SU7_EDGES; i++) {
         const Edge3D& e = SU7_EDGES[i];
-        const Point2D& p0 = m_proj[e.v0];
-        const Point2D& p1 = m_proj[e.v1];
+        const Point2D& p0 = proj[e.v0];
+        const Point2D& p1 = proj[e.v1];
 
         if (p0.visible && p1.visible) {
             int16_t x0 = p0.x, y0 = p0.y;

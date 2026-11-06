@@ -14,11 +14,16 @@
 #include "core/Logger.h"
 #include "core/MemoryGuard.h"
 #include "core/TimeService.h"
+#include "core/LuaIconCodec.h"
 #include "hal/BoardHAL.h"
 #include "hal/DisplayHAL.h"
 #include "ui/UIManager.h"
 #include "ui/KeyboardView.h"
 #include <WiFi.h>
+#include <HTTPClient.h>
+#include <WiFiClientSecure.h>
+#include <LittleFS.h>
+#include <SD.h>
 #include <esp32/rom/tjpgd.h>
 
 extern "C" {
@@ -464,6 +469,18 @@ static int gui_createSampleImages(lua_State* L) {
     return 1;
 }
 
+static int gui_drawBase64(lua_State* L) {
+    LUA_CHECK_HEAP(L, 128);
+    int16_t cx      = (int16_t)luaL_checkinteger(L, 1);
+    int16_t cy      = (int16_t)luaL_checkinteger(L, 2);
+    const char* b64 = safeCheckString(L, 3);
+    uint8_t scale   = (uint8_t)luaL_optinteger(L, 4, 2);
+    uint16_t fg     = (uint16_t)luaL_optinteger(L, 5, TFT_WHITE);
+    bool ok = core::LuaIconCodec::drawBase64Icon(tft(), b64, cx, cy, fg, scale);
+    lua_pushboolean(L, ok);
+    return 1;
+}
+
 // ------------------------------------------------------------ input.* API
 static int input_getTouch(lua_State* L) {
     LUA_CHECK_HEAP(L, 0);
@@ -503,8 +520,32 @@ static int sys_getTime(lua_State* L) {
     LUA_CHECK_HEAP(L, 64);
     char tBuf[16];
     core::TimeService::formatHHMMSS(tBuf, sizeof(tBuf));
+    bool synced = core::TimeService::isSynced();
+    time_t now = time(nullptr);
+    struct tm tmInfo;
+    memset(&tmInfo, 0, sizeof(tmInfo));
+    localtime_r(&now, &tmInfo);
+
     lua_pushstring(L, tBuf);
-    lua_pushboolean(L, core::TimeService::isSynced());
+    lua_pushboolean(L, synced);
+    lua_pushinteger(L, (lua_Integer)now);
+    lua_pushinteger(L, tmInfo.tm_hour);
+    lua_pushinteger(L, tmInfo.tm_min);
+    lua_pushinteger(L, tmInfo.tm_sec);
+    lua_pushinteger(L, tmInfo.tm_mday);
+    lua_pushinteger(L, tmInfo.tm_mon + 1);
+    lua_pushinteger(L, tmInfo.tm_year + 1900);
+    return 9;
+}
+static int sys_syncNTP(lua_State* L) {
+    LUA_CHECK_HEAP(L, 512);
+    uint32_t waitMs = (uint32_t)luaL_optinteger(L, 1, 2000);
+    if (waitMs > 4000) waitMs = 4000;
+    bool ok = core::TimeService::syncNtpNow(waitMs);
+    char tBuf[16];
+    core::TimeService::formatHHMMSS(tBuf, sizeof(tBuf));
+    lua_pushboolean(L, ok);
+    lua_pushstring(L, tBuf);
     return 2;
 }
 static int sys_getRegion(lua_State* L) {
@@ -1073,6 +1114,351 @@ static int wifi_scan(lua_State* L) {
     return 1;
 }
 
+// -------------------------------------------------------- http.* & net.* API
+static constexpr int LUA_HTTP_MAX_STRING_SIZE = 16384; // 16 KB cap to protect Lua SRAM
+static constexpr int LUA_HTTP_DEFAULT_TIMEOUT = 4000;  // 4s max blocking timeout
+
+static void applyLuaHeaders(lua_State* L, int idx, HTTPClient& http) {
+    if (!lua_istable(L, idx)) return;
+    lua_pushnil(L);
+    while (lua_next(L, idx) != 0) {
+        if (lua_isstring(L, -2) && lua_isstring(L, -1)) {
+            http.addHeader(lua_tostring(L, -2), lua_tostring(L, -1));
+        }
+        lua_pop(L, 1);
+    }
+}
+
+static int l_http_request_impl(lua_State* L, const char* method, const char* url,
+                               const char* body, size_t bodyLen,
+                               const char* contentType, int headersIdx, int timeoutMs) {
+    LUA_CHECK_HEAP(L, 4096);
+    if (WiFi.status() != WL_CONNECTED) {
+        lua_pushnil(L);
+        lua_pushinteger(L, -1);
+        lua_pushstring(L, "WiFi not connected");
+        return 3;
+    }
+
+    if (timeoutMs < 500) timeoutMs = 500;
+    if (timeoutMs > 8000) timeoutMs = 8000;
+
+    pumpOS();
+    checkAbort(L);
+
+    HTTPClient http;
+    http.setConnectTimeout(timeoutMs);
+    http.setTimeout(timeoutMs);
+    http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+
+    bool isHttps = (strncasecmp(url, "https://", 8) == 0);
+    int httpCode = -1;
+    String payload;
+    String errStr;
+    bool tooLarge = false;
+
+    if (isHttps) {
+        // Check heap before MbedTLS allocation (~40 KB required)
+        if (xPortGetFreeHeapSize() < 48000) {
+            lua_pushnil(L);
+            lua_pushinteger(L, -4);
+            lua_pushstring(L, "Low SRAM for TLS");
+            return 3;
+        }
+        WiFiClientSecure secureClient;
+        secureClient.setInsecure(); // Skip CA chain allocation to save ~40 KB SRAM
+        if (!http.begin(secureClient, url)) {
+            lua_pushnil(L);
+            lua_pushinteger(L, -2);
+            lua_pushstring(L, "http.begin failed");
+            return 3;
+        }
+        if (contentType && contentType[0] != '\0') {
+            http.addHeader("Content-Type", contentType);
+        }
+        if (headersIdx > 0 && lua_istable(L, headersIdx)) {
+            applyLuaHeaders(L, headersIdx, http);
+        }
+        if (strcasecmp(method, "GET") == 0) {
+            httpCode = http.GET();
+        } else if (strcasecmp(method, "POST") == 0) {
+            httpCode = http.POST((uint8_t*)body, bodyLen);
+        } else {
+            httpCode = http.sendRequest(method, (uint8_t*)body, bodyLen);
+        }
+        if (httpCode > 0) {
+            int len = http.getSize();
+            if (len > LUA_HTTP_MAX_STRING_SIZE) {
+                tooLarge = true;
+            } else {
+                payload = http.getString();
+                if ((int)payload.length() > LUA_HTTP_MAX_STRING_SIZE) {
+                    payload = payload.substring(0, LUA_HTTP_MAX_STRING_SIZE);
+                }
+            }
+        } else {
+            errStr = http.errorToString(httpCode);
+        }
+        http.end();
+    } else {
+        WiFiClient client;
+        if (!http.begin(client, url)) {
+            lua_pushnil(L);
+            lua_pushinteger(L, -2);
+            lua_pushstring(L, "http.begin failed");
+            return 3;
+        }
+        if (contentType && contentType[0] != '\0') {
+            http.addHeader("Content-Type", contentType);
+        }
+        if (headersIdx > 0 && lua_istable(L, headersIdx)) {
+            applyLuaHeaders(L, headersIdx, http);
+        }
+        if (strcasecmp(method, "GET") == 0) {
+            httpCode = http.GET();
+        } else if (strcasecmp(method, "POST") == 0) {
+            httpCode = http.POST((uint8_t*)body, bodyLen);
+        } else {
+            httpCode = http.sendRequest(method, (uint8_t*)body, bodyLen);
+        }
+        if (httpCode > 0) {
+            int len = http.getSize();
+            if (len > LUA_HTTP_MAX_STRING_SIZE) {
+                tooLarge = true;
+            } else {
+                payload = http.getString();
+                if ((int)payload.length() > LUA_HTTP_MAX_STRING_SIZE) {
+                    payload = payload.substring(0, LUA_HTTP_MAX_STRING_SIZE);
+                }
+            }
+        } else {
+            errStr = http.errorToString(httpCode);
+        }
+        http.end();
+    }
+
+    pumpOS();
+    checkAbort(L);
+
+    if (tooLarge) {
+        lua_pushnil(L);
+        lua_pushinteger(L, httpCode);
+        lua_pushstring(L, "Payload > 16KB; use http.download()");
+        return 3;
+    }
+
+    if (httpCode > 0) {
+        LUA_CHECK_HEAP(L, payload.length() + 128);
+        lua_pushlstring(L, payload.c_str(), payload.length());
+        lua_pushinteger(L, httpCode);
+        return 2;
+    } else {
+        lua_pushnil(L);
+        lua_pushinteger(L, httpCode);
+        lua_pushstring(L, errStr.c_str());
+        return 3;
+    }
+}
+
+// http.get(url [, headers_tbl, timeout_ms]) -> body|nil, code, err
+static int http_get(lua_State* L) {
+    const char* url = safeCheckString(L, 1);
+    int timeout = (int)luaL_optinteger(L, 3, LUA_HTTP_DEFAULT_TIMEOUT);
+    return l_http_request_impl(L, "GET", url, nullptr, 0, nullptr, 2, timeout);
+}
+
+// http.post(url, body [, content_type, headers_tbl]) -> body|nil, code, err
+static int http_post(lua_State* L) {
+    const char* url = safeCheckString(L, 1);
+    size_t bodyLen = 0;
+    const char* body = luaL_optlstring(L, 2, "", &bodyLen);
+    const char* contentType = safeOptString(L, 3, "application/json");
+    return l_http_request_impl(L, "POST", url, body, bodyLen, contentType, 4, LUA_HTTP_DEFAULT_TIMEOUT);
+}
+
+// http.request(method, url [, body, headers_tbl, timeout_ms]) -> body|nil, code, err
+static int http_request(lua_State* L) {
+    const char* method = safeCheckString(L, 1);
+    const char* url = safeCheckString(L, 2);
+    size_t bodyLen = 0;
+    const char* body = luaL_optlstring(L, 3, "", &bodyLen);
+    int timeout = (int)luaL_optinteger(L, 5, LUA_HTTP_DEFAULT_TIMEOUT);
+    return l_http_request_impl(L, method, url, body, bodyLen, nullptr, 4, timeout);
+}
+
+// http.download(url, dest_path) -> ok (bool), bytes_written (int), status_code (int)
+static int http_download(lua_State* L) {
+    LUA_CHECK_HEAP(L, 2048);
+    const char* url  = safeCheckString(L, 1);
+    const char* path = safeCheckString(L, 2);
+
+    if (WiFi.status() != WL_CONNECTED) {
+        lua_pushboolean(L, 0);
+        lua_pushinteger(L, 0);
+        lua_pushinteger(L, -1);
+        return 3;
+    }
+
+    bool isHttps = (strncasecmp(url, "https://", 8) == 0);
+    if (isHttps && xPortGetFreeHeapSize() < 48000) {
+        lua_pushboolean(L, 0);
+        lua_pushinteger(L, 0);
+        lua_pushinteger(L, -4);
+        return 3;
+    }
+
+    HTTPClient http;
+    http.setConnectTimeout(5000);
+    http.setTimeout(5000);
+    http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+
+    WiFiClient client;
+    WiFiClientSecure secureClient;
+    bool begun = false;
+    if (isHttps) {
+        secureClient.setInsecure();
+        begun = http.begin(secureClient, url);
+    } else {
+        begun = http.begin(client, url);
+    }
+
+    if (!begun) {
+        lua_pushboolean(L, 0);
+        lua_pushinteger(L, 0);
+        lua_pushinteger(L, -2);
+        return 3;
+    }
+
+    int httpCode = http.GET();
+    if (httpCode != HTTP_CODE_OK) {
+        http.end();
+        lua_pushboolean(L, 0);
+        lua_pushinteger(L, 0);
+        lua_pushinteger(L, httpCode);
+        return 3;
+    }
+
+    if (strncmp(path, "/apps/", 6) == 0) {
+        StorageHAL::ensureDirectory("/apps");
+    }
+
+    File f;
+    if (strncmp(path, "/sd/", 4) == 0) {
+        f = SD.open(path + 3, FILE_WRITE);
+    } else {
+        f = LittleFS.open(path, "w");
+    }
+
+    if (!f) {
+        http.end();
+        lua_pushboolean(L, 0);
+        lua_pushinteger(L, 0);
+        lua_pushinteger(L, -3);
+        return 3;
+    }
+
+    WiFiClient* stream = http.getStreamPtr();
+    uint8_t buff[512];
+    int totalBytes = 0;
+    int len = http.getSize();
+    uint32_t lastActivity = millis();
+
+    while ((http.connected() || (stream && stream->available() > 0)) && (len > 0 || len == -1)) {
+        size_t avail = stream ? stream->available() : 0;
+        if (avail) {
+            int toRead = (avail > sizeof(buff)) ? (int)sizeof(buff) : (int)avail;
+            int c = stream->readBytes(buff, toRead);
+            if (c > 0) {
+                f.write(buff, c);
+                totalBytes += c;
+                if (len > 0) len -= c;
+                lastActivity = millis();
+            }
+        } else if (millis() - lastActivity > 5000) {
+            break;
+        }
+        pumpOS();
+        if (s_abort) break;
+        delay(1);
+    }
+
+    f.flush();
+    f.close();
+    http.end();
+
+    if (s_abort) {
+        checkAbort(L);
+    }
+
+    // Automatically register newly downloaded /apps/*.lua scripts on Home Screen
+    if (totalBytes > 0 && strncmp(path, "/apps/", 6) == 0) {
+        core::AppRegistry::scanFilesystemApps();
+    }
+
+    LOG_INFO("HTTP", "Downloaded %s -> %s (%d B, HTTP %d)", url, path, totalBytes, httpCode);
+    lua_pushboolean(L, totalBytes > 0);
+    lua_pushinteger(L, totalBytes);
+    lua_pushinteger(L, httpCode);
+    return 3;
+}
+
+// net.ping(host [, port, timeout_ms]) -> alive (bool), rtt_ms (int)
+static int net_ping(lua_State* L) {
+    LUA_CHECK_HEAP(L, 512);
+    const char* host = safeCheckString(L, 1);
+    uint16_t port = (uint16_t)luaL_optinteger(L, 2, 80);
+    int timeoutMs = (int)luaL_optinteger(L, 3, 2000);
+    if (port == 0) port = 80;
+
+    if (WiFi.status() != WL_CONNECTED) {
+        lua_pushboolean(L, false);
+        lua_pushinteger(L, -1);
+        return 2;
+    }
+
+    pumpOS();
+    checkAbort(L);
+
+    uint32_t t0 = millis();
+    WiFiClient client;
+    bool ok = client.connect(host, port, timeoutMs);
+    uint32_t rtt = millis() - t0;
+    if (ok) {
+        client.stop();
+    } else if (port == 80) {
+        // Try port 53 (DNS) or 443 (HTTPS) if port 80 is closed on target host (e.g. 1.1.1.1 / 8.8.8.8)
+        t0 = millis();
+        ok = client.connect(host, 53, timeoutMs);
+        rtt = millis() - t0;
+        if (ok) client.stop();
+    }
+
+    lua_pushboolean(L, ok);
+    lua_pushinteger(L, ok ? (lua_Integer)rtt : -1);
+    return 2;
+}
+
+// net.getTime() -> epoch (int), formatted_str (string), hour, min, sec, day, month, year
+static int net_getTime(lua_State* L) {
+    LUA_CHECK_HEAP(L, 64);
+    char tBuf[16];
+    core::TimeService::formatHHMMSS(tBuf, sizeof(tBuf));
+    time_t now = time(nullptr);
+    struct tm tmInfo;
+    memset(&tmInfo, 0, sizeof(tmInfo));
+    localtime_r(&now, &tmInfo);
+
+    lua_pushinteger(L, (lua_Integer)now);
+    lua_pushstring(L, tBuf);
+    lua_pushinteger(L, tmInfo.tm_hour);
+    lua_pushinteger(L, tmInfo.tm_min);
+    lua_pushinteger(L, tmInfo.tm_sec);
+    lua_pushinteger(L, tmInfo.tm_mday);
+    lua_pushinteger(L, tmInfo.tm_mon + 1);
+    lua_pushinteger(L, tmInfo.tm_year + 1900);
+    return 8;
+}
+
 static void registerLib(lua_State* L, const char* name, const luaL_Reg* funcs) {
     lua_createtable(L, 0, 16);
     luaL_setfuncs(L, funcs, 0);
@@ -1093,14 +1479,15 @@ static void openSandbox(lua_State* L) {
         {"fillRect", gui_fillRect}, {"drawRect", gui_drawRect}, {"drawText", gui_drawText},
         {"drawLine", gui_drawLine}, {"drawFastHLine", gui_drawFastHLine},
         {"fillCircle", gui_fillCircle}, {"drawPixel", gui_drawPixel},
-        {"drawImage", gui_drawImage}, {"createSampleImages", gui_createSampleImages},
+        {"drawImage", gui_drawImage}, {"drawBase64", gui_drawBase64},
+        {"createSampleImages", gui_createSampleImages},
         {"keyboard", gui_keyboard},
         {nullptr, nullptr}};
     static const luaL_Reg inputLib[] = {{"getTouch", input_getTouch}, {nullptr, nullptr}};
     static const luaL_Reg sysLib[] = {
         {"delay", sys_delay}, {"beep", sys_beep}, {"getHeap", sys_getHeap},
         {"getLdr", sys_getLdr}, {"getUptime", sys_getUptime},
-        {"getTime", sys_getTime}, {"getRegion", sys_getRegion},
+        {"getTime", sys_getTime}, {"syncNTP", sys_syncNTP}, {"getRegion", sys_getRegion},
         {"getStorageTotal", sys_getStorageTotal}, {"getStorageUsed", sys_getStorageUsed},
         {"isSDMounted", sys_isSDMounted}, {"probeSD", sys_probeSD},
         {"getKernelLog", sys_getKernelLog}, {"clearKernelLog", sys_clearKernelLog},
@@ -1123,11 +1510,22 @@ static void openSandbox(lua_State* L) {
         {"getIP", wifi_getIP}, {"getRSSI", wifi_getRSSI},
         {"connect", wifi_connect}, {"disconnect", wifi_disconnect},
         {"scan", wifi_scan}, {nullptr, nullptr}};
+    static const luaL_Reg httpLib[] = {
+        {"get", http_get}, {"post", http_post},
+        {"request", http_request}, {"download", http_download},
+        {nullptr, nullptr}};
+    static const luaL_Reg netLib[] = {
+        {"ping", net_ping}, {"getTime", net_getTime}, {"syncNTP", sys_syncNTP},
+        {"get", http_get}, {"post", http_post},
+        {"request", http_request}, {"download", http_download},
+        {nullptr, nullptr}};
     registerLib(L, "gui", guiLib);
     registerLib(L, "input", inputLib);
     registerLib(L, "sys", sysLib);
     registerLib(L, "file", fileLib);
     registerLib(L, "wifi", wifiLib);
+    registerLib(L, "http", httpLib);
+    registerLib(L, "net", netLib);
 }
 
 // ------------------------------------------------------------- app logic

@@ -4,10 +4,11 @@
  */
 
 #include "AppRegistry.h"
+#include "LuaIconCodec.h"
 #include "apps/SettingsApp.h"
+#include "apps/PlayStoreApp.h"
 #include "apps/AppManagerApp.h"
 #include "apps/WallpaperApp.h"
-#include "apps/AboutApp.h"
 #include "apps/SU7App.h"
 #include "ui/UIManager.h"
 
@@ -20,9 +21,9 @@ bool AppRegistry::s_initialized = false;
 
 // Native static application instances (zero dynamic allocations at launch)
 static apps::SettingsApp   s_nativeSettings;
+static apps::PlayStoreApp  s_nativePlayStore;
 static apps::AppManagerApp s_nativeAppMgr;
 static apps::WallpaperApp  s_nativeWallpapers;
-static apps::AboutApp      s_nativeAbout;
 static apps::SU7App        s_nativeSU7;
 
 void AppRegistry::capitalize(char* str) {
@@ -38,6 +39,7 @@ void AppRegistry::init() {
 
     // Register native system applications (About is now integrated into Settings)
     registerApp(&s_nativeSettings,   "settings",   "Settings",   "ICON_SETTINGS",  0x324B, TFT_WHITE, "", false);
+    registerApp(&s_nativePlayStore,  "playstore",  "Play Store", "ICON_PLAYSTORE", 0x0276, TFT_WHITE, "", false);
     registerApp(&s_nativeAppMgr,     "appmgr",     "App Mgr",    "ICON_APPMGR",    0x04D3, TFT_WHITE, "", false);
     registerApp(&s_nativeWallpapers, "wallpapers", "Wallpapers", "ICON_WALLPAPER", 0x6815, TFT_WHITE, "", false);
     registerApp(&s_nativeSU7,        "su7",        "SU7 3D",     "ICON_SU7",       0xFEE0, 0x10A2,    "", false);
@@ -179,9 +181,12 @@ void AppRegistry::scanFilesystemApps(StorageHAL* storage) {
 
             if (s_appCount >= MAX_REGISTERED_APPS) break;
 
-            // Assign distinct color palette
+            // Assign distinct color palette & check Lua script header (-- @name, -- @bg)
             uint16_t bgColor = 0x04D3; // Installed Local App Teal
-            const char* displayName = capName;
+            char customName[24] = {0};
+            LuaIconCodec::parseScriptHeader(cstr, customName, sizeof(customName), &bgColor, nullptr, 0);
+
+            const char* displayName = (customName[0] != '\0') ? customName : capName;
             if (strcasecmp(baseName.c_str(), "gallery") == 0) bgColor = 0xD8A7;
             else if (strcasecmp(baseName.c_str(), "calc") == 0) bgColor = 0x2C9F;
             else if (strcasecmp(baseName.c_str(), "paint") == 0) bgColor = 0x9175;
@@ -229,9 +234,18 @@ void AppRegistry::scanFilesystemApps(StorageHAL* storage) {
             capName[sizeof(capName) - 1] = '\0';
             capitalize(capName);
 
-            // Prefix with "SD-"
+            uint16_t sdBg = 0xFD00;
+            char customSdName[24] = {0};
+            LuaIconCodec::parseScriptHeader(cstr, customSdName, sizeof(customSdName), &sdBg, nullptr, 0);
+
+            // Use custom -- @name if present, otherwise prefix with "SD-"
             char sdName[24];
-            snprintf(sdName, sizeof(sdName), "SD-%.19s", capName);
+            if (customSdName[0] != '\0') {
+                strncpy(sdName, customSdName, sizeof(sdName) - 1);
+                sdName[sizeof(sdName) - 1] = '\0';
+            } else {
+                snprintf(sdName, sizeof(sdName), "SD-%.19s", capName);
+            }
 
             bool exists = false;
             for (size_t j = 0; j < s_appCount; j++) {
@@ -245,7 +259,7 @@ void AppRegistry::scanFilesystemApps(StorageHAL* storage) {
             if (s_appCount >= MAX_REGISTERED_APPS) break;
 
             DynamicScriptApp* dynApp = new DynamicScriptApp(cstr, sdName, "ICON_LUA");
-            registerApp(dynApp, baseName.c_str(), sdName, "ICON_LUA", 0xFD00, TFT_WHITE, cstr, true);
+            registerApp(dynApp, baseName.c_str(), sdName, "ICON_LUA", sdBg, TFT_WHITE, cstr, true);
         }
     } else {
         // SD is unmounted: prune all registered apps with path starting with /sd/

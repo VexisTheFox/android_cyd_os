@@ -18,6 +18,7 @@ namespace ui {
 // Application Identifiers for Launcher Shortcuts & Icon Glyphs
 enum class AppID : uint8_t {
     SETTINGS = 0,   ///< System Settings & About (Scrollable)
+    PLAY_STORE,     ///< Native Play Store & Cloud App Installer
     APP_MANAGER,    ///< Native Application Manager & SD Installer
     WALLPAPERS,     ///< Native Wallpaper Selector (Prefilled + SD Card)
     SU7_3D,         ///< Xiaomi SU7 Ultra 3D Real-Time Demo
@@ -110,6 +111,7 @@ private:
     // Vector Glyph Renderers for 44x44 Android App Icons
     static void drawIconGlyph(AppID id, int16_t cx, int16_t cy, uint16_t fgColor);
     static void drawSettingsGlyph(int16_t cx, int16_t cy, uint16_t fgColor);
+    static void drawPlayStoreGlyph(int16_t cx, int16_t cy, uint16_t fgColor);
     static void drawAppManagerGlyph(int16_t cx, int16_t cy, uint16_t fgColor);
     static void drawWallpapersGlyph(int16_t cx, int16_t cy, uint16_t fgColor);
     static void drawAboutGlyph(int16_t cx, int16_t cy, uint16_t fgColor);

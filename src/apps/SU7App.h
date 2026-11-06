@@ -59,7 +59,6 @@ private:
     uint32_t m_lastFrameTime;
     uint32_t m_frameCount;
     float    m_fps;
-    Point2D  m_proj[NUM_SU7_VERTICES];
 
     static constexpr float CAM_DIST = 6.2f;
     static constexpr float FOCAL    = 255.0f;

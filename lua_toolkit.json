@@ -501,6 +501,83 @@
           "returns": { "type": "boolean", "description": "Alias for sys.runScript(path)" }
         }
       ]
+    },
+    "http": {
+      "description": "HTTP / HTTPS REST Client & Streaming File Downloader (TLS setInsecure() enabled, 16KB string cap).",
+      "functions": [
+        {
+          "name": "http.get",
+          "signature": "http.get(url [, headers_tbl, timeout_ms])",
+          "params": [
+            { "name": "url", "type": "string", "description": "HTTP or HTTPS URL" },
+            { "name": "headers_tbl", "type": "table", "default": "nil", "description": "Optional table of custom request headers" },
+            { "name": "timeout_ms", "type": "integer", "default": 4000, "description": "Request timeout in milliseconds" }
+          ],
+          "returns": { "type": "string|nil, integer, string", "description": "body, status_code, error_string" }
+        },
+        {
+          "name": "http.post",
+          "signature": "http.post(url, body [, content_type, headers_tbl])",
+          "params": [
+            { "name": "url", "type": "string", "description": "HTTP or HTTPS endpoint" },
+            { "name": "body", "type": "string", "description": "Request payload" },
+            { "name": "content_type", "type": "string", "default": "application/json", "description": "MIME content type" },
+            { "name": "headers_tbl", "type": "table", "default": "nil", "description": "Optional headers table" }
+          ],
+          "returns": { "type": "string|nil, integer, string", "description": "body, status_code, error_string" }
+        },
+        {
+          "name": "http.request",
+          "signature": "http.request(method, url [, body, headers_tbl, timeout_ms])",
+          "params": [
+            { "name": "method", "type": "string", "description": "HTTP verb (GET, POST, PUT, DELETE, PATCH)" },
+            { "name": "url", "type": "string", "description": "HTTP or HTTPS URL" },
+            { "name": "body", "type": "string", "default": "", "description": "Optional body payload" },
+            { "name": "headers_tbl", "type": "table", "default": "nil", "description": "Optional headers table" },
+            { "name": "timeout_ms", "type": "integer", "default": 4000, "description": "Timeout in ms" }
+          ],
+          "returns": { "type": "string|nil, integer, string", "description": "body, status_code, error_string" }
+        },
+        {
+          "name": "http.download",
+          "signature": "http.download(url, dest_path)",
+          "params": [
+            { "name": "url", "type": "string", "description": "HTTP or HTTPS file URL" },
+            { "name": "dest_path", "type": "string", "description": "Destination path on LittleFS ('/apps/my_app.lua') or SD ('/sd/file.bin')" }
+          ],
+          "returns": { "type": "boolean, integer, integer", "description": "ok, bytes_written, status_code" },
+          "notes": "Streams in 512-byte stack chunks directly to disk without entering the Lua heap. Automatically registers '/apps/*.lua' onto the Home Screen."
+        }
+      ]
+    },
+    "net": {
+      "description": "Layer 4 / Layer 7 Network Diagnostics & NTP Time Sync.",
+      "functions": [
+        {
+          "name": "net.ping",
+          "signature": "net.ping(host [, port, timeout_ms])",
+          "params": [
+            { "name": "host", "type": "string", "description": "Hostname or IPv4 address (e.g. '1.1.1.1' or 'github.com')" },
+            { "name": "port", "type": "integer", "default": 80, "description": "TCP port probe (falls back to 53 if port 80 is closed)" },
+            { "name": "timeout_ms", "type": "integer", "default": 2000, "description": "Probe timeout in ms" }
+          ],
+          "returns": { "type": "boolean, integer", "description": "alive, rtt_ms" }
+        },
+        {
+          "name": "net.getTime",
+          "signature": "net.getTime()",
+          "params": [],
+          "returns": { "type": "integer, string, integer, integer, integer, integer, integer, integer", "description": "epoch, formatted_hhmmss, hour, min, sec, day, month, year" }
+        },
+        {
+          "name": "net.syncNTP",
+          "signature": "net.syncNTP([wait_ms])",
+          "params": [
+            { "name": "wait_ms", "type": "integer", "default": 2000, "description": "Max wait time in ms for NTP sync" }
+          ],
+          "returns": { "type": "boolean, string", "description": "synced_ok, formatted_hhmmss" }
+        }
+      ]
     }
   },
   "app_design_rules": [
@@ -533,7 +610,8 @@
     "-- ===================================================================",
     "-- CYD Android OS Application",
     "-- @name: App Display Name",
-    "-- @icon: ICON_APP",
+    "-- @bg: 0x0276",
+    "-- @icon_b64: <base64-encoded 16x16 1-bit(32B), 2-bit(64B), RGB332(256B), or RGB565(512B) icon>",
     "-- @orientation: portrait",
     "-- @author: Developer Name",
     "-- @version: 1.0.0",

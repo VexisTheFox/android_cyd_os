@@ -12,7 +12,6 @@ struct Point3D {
 struct Point2D {
     int16_t x;
     int16_t y;
-    float z;      // for depth sorting / intensity
     bool visible;
 };
 

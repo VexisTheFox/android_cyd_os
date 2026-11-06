@@ -15,7 +15,7 @@
 
 namespace core {
 
-static char   s_earlyBuffer[1024] = {0};
+static char   s_earlyBuffer[384]  = {0};
 static size_t s_earlyLen          = 0;
 static bool   s_inLogger          = false; // Re-entrancy guard
 
