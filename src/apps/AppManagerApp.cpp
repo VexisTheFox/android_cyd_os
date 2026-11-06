@@ -68,6 +68,7 @@ void AppManagerApp::onPause() {
 
 void AppManagerApp::onDestroy() {
     m_sdPackages.clear();
+    m_sdPackages.shrink_to_fit();
     m_state = core::AppState::DESTROYED;
 }
 
@@ -83,6 +84,7 @@ bool AppManagerApp::isCoreBundledLua(const char* path) const {
 
 void AppManagerApp::refreshSDPackages() {
     m_sdPackages.clear();
+    m_sdPackages.shrink_to_fit();
     if (!StorageHAL::isSDMounted()) {
         StorageHAL::probeSDCard();
     }

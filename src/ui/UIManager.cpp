@@ -983,6 +983,9 @@ void UIManager::update() {
                     s_statusBarInstance->render(false);
                 }
             }
+            core::AppRegistry::gc();
+            if (s_retiredApp) { delete s_retiredApp; s_retiredApp = nullptr; }
+            core::AppRegistry::gc();
             LauncherView::update();
             break;
         }
@@ -1004,6 +1007,7 @@ void UIManager::update() {
                     s_activeApp->onRender(tft, 0, VIEWPORT_Y, vpW, vpH);
                 }
             }
+            core::AppRegistry::gc();
             if (s_retiredApp) {
                 delete s_retiredApp;
                 s_retiredApp = nullptr;

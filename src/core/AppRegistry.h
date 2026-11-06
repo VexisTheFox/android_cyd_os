@@ -108,6 +108,7 @@ public:
      * @brief Reset registry and free dynamic instances.
      */
     static void clear();
+    static void gc();
 
     // -------------------------------------------------------------
     // Query APIs

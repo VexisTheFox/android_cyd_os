@@ -255,6 +255,11 @@ void AppRegistry::clear() {
     s_initialized = false;
 }
 
+void AppRegistry::gc() {
+    App* active = getActiveApp();
+    flushDeferredDelete(active);
+}
+
 size_t AppRegistry::getAppCount() {
     return s_appCount;
 }
@@ -302,16 +307,8 @@ bool AppRegistry::launchApp(size_t index) {
         return false;
     }
 
-    // Hardware Sandboxing: enforce >40 KB contiguous free heap
-    uint32_t largestBlock = ESP.getMaxAllocHeap();
-    if (largestBlock < 40960) {
-        Serial.printf("[AppRegistry] OOM Prevention: contiguous heap %u < 40960 B. Launch aborted.\n",
-                      (unsigned)largestBlock);
-        ui::UIManager::showToast("Low RAM: Cannot Launch App", 2000);
-        return false;
-    }
-
-    // If another app is active, pause & retire it safely (so 'this' is never deleted mid-callback)
+    // 1. First, tear down any previously active app or flush deferred deletions
+    // BEFORE checking free heap, so outgoing app memory (e.g. PlayStore catalog) is freed!
     App* prevRunning = nullptr;
     if (s_activeAppIndex >= 0 && s_activeAppIndex != (int)index && (size_t)s_activeAppIndex < s_appCount) {
         AppDescriptor &prev = s_apps[s_activeAppIndex];
@@ -329,7 +326,19 @@ bool AppRegistry::launchApp(size_t index) {
         flushDeferredDelete();
     }
 
-    // Lazily instantiate the target app on demand!
+    // 2. Fragmentation-tolerant OOM guard:
+    // After Wi-Fi/TLS/Lua sessions, 100 KB total free heap may be split across 2-3 blocks
+    // of ~28-36 KB each. Require >= 20 KB total free RAM and >= 10 KB largest contiguous block.
+    uint32_t freeHeap     = ESP.getFreeHeap();
+    uint32_t largestBlock = ESP.getMaxAllocHeap();
+    if (freeHeap < 20480 || largestBlock < 10240) {
+        Serial.printf("[AppRegistry] OOM Prevention: free=%u B, maxBlock=%u B. Launch aborted.\n",
+                      (unsigned)freeHeap, (unsigned)largestBlock);
+        ui::UIManager::showToast("Low RAM: Cannot Launch App", 2000);
+        return false;
+    }
+
+    // 3. Lazily instantiate the target app on demand!
     if (!s_apps[index].app && s_apps[index].isDynamic) {
         s_apps[index].app = createLazyAppInstance(s_apps[index]);
     }

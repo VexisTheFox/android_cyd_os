@@ -575,7 +575,7 @@ void SettingsApp::drawScrollContent(TFT_eSPI &display, int vx, int vy, int vw, i
     int cardW = vw - 14;
 
     // 84px band height = only 3 sprite flushes for the entire 250px viewport!
-    static constexpr int BAND_H = 84;
+    static constexpr int BAND_H = 50;
     TFT_eSprite band(&display);
     band.setColorDepth(16);
     bool spriteOk = (band.createSprite(vw, BAND_H) != nullptr);
