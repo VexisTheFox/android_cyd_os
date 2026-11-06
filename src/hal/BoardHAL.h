@@ -110,7 +110,14 @@ void stopTone();
  * @brief Poll the physical BOOT button (GPIO 0) as the System Power / Sleep / Lock button.
  * @return true once per debounced button press event.
  */
+enum class PowerButtonEvent : uint8_t {
+    NONE        = 0,
+    SHORT_PRESS = 1,
+    LONG_PRESS  = 2
+};
+
 bool pollPowerButton();
+PowerButtonEvent pollPowerButtonEvent();
 
 /**
  * @brief Check if the physical BOOT / Power button (GPIO 0) is currently held down.

@@ -134,6 +134,36 @@ bool isPowerButtonDown() {
 }
 
 bool pollPowerButton() {
+    return (pollPowerButtonEvent() == PowerButtonEvent::SHORT_PRESS);
+}
+
+PowerButtonEvent pollPowerButtonEvent() {
+    uint32_t now = millis();
+    bool rawDown = (digitalRead(CYD_BOOT_BTN) == LOW);
+
+    if (rawDown != s_powerBtnDown) {
+        s_powerBtnDown = rawDown;
+        if (rawDown) {
+            s_powerBtnChangeMs = now;
+            s_powerBtnFired = false;
+        } else {
+            uint32_t heldMs = now - s_powerBtnChangeMs;
+            if (!s_powerBtnFired && heldMs >= 35 && (now - s_powerBtnCooldownMs >= 250)) {
+                s_powerBtnCooldownMs = now;
+                return PowerButtonEvent::SHORT_PRESS;
+            }
+            s_powerBtnFired = false;
+        }
+    } else if (rawDown && !s_powerBtnFired) {
+        if (now - s_powerBtnChangeMs >= 600) {
+            s_powerBtnFired = true;
+            s_powerBtnCooldownMs = now;
+            return PowerButtonEvent::LONG_PRESS;
+        }
+    }
+    return PowerButtonEvent::NONE;
+}
+#if 0
     uint32_t now = millis();
     bool rawDown = (digitalRead(CYD_BOOT_BTN) == LOW);
 
@@ -154,4 +184,5 @@ bool pollPowerButton() {
     return false;
 }
 
+#endif
 } // namespace hal

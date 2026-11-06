@@ -17,6 +17,10 @@
 #include "apps/WallpaperApp.h"
 #include "apps/AboutApp.h"
 #include "apps/SU7App.h"
+#include <WiFi.h>
+#include <LittleFS.h>
+#include <SD.h>
+#include <esp_sleep.h>
 
 namespace ui {
 
@@ -35,6 +39,7 @@ bool      UIManager::s_isBuiltinApp        = false;
 static bool s_isCustomApp                  = false;
 static bool s_isLandscape                  = false;
 static App* s_retiredApp                   = nullptr;
+static bool s_powerMenuOpen                = false;
 uint32_t  UIManager::s_bootStartTime       = 0;
 uint32_t  UIManager::s_lastStatusUpdate    = 0;
 uint32_t  UIManager::s_toastHideTime       = 0;
@@ -487,11 +492,143 @@ void UIManager::handleLockScreenTouch(const hal::TouchEvent& event) {
     }
 }
 
+static void drawPowerMenu() {
+    TFT_eSPI &tft = hal::getDisplay();
+    tft.fillRoundRect(16, 40, 208, 236, 8, 0x0821);
+    tft.drawRoundRect(16, 40, 208, 236, 8, 0x07FF);
+    tft.drawRoundRect(17, 41, 206, 234, 7, 0x3186);
+
+    // Header
+    tft.fillRoundRect(18, 42, 204, 30, 6, 0x10A2);
+    tft.drawFastHLine(18, 72, 204, 0x07FF);
+    tft.setTextFont(2);
+    tft.setTextDatum(MC_DATUM);
+    tft.setTextColor(0x07FF, 0x10A2);
+    tft.drawString("POWER OPTIONS", 120, 57);
+
+    // 1. Restart UI Daemon (Y = 80..124)
+    tft.fillRoundRect(26, 80, 188, 42, 6, 0x04D3);
+    tft.drawRoundRect(26, 80, 188, 42, 6, 0x07E0);
+    tft.setTextFont(2);
+    tft.setTextColor(TFT_WHITE, 0x04D3);
+    tft.drawString("RESTART UI DAEMON", 120, 94);
+    tft.setTextFont(1);
+    tft.setTextColor(0xE71C, 0x04D3);
+    tft.drawString("Reload Shell, Apps & Free RAM", 120, 111);
+
+    // 2. Restart System (Y = 130..174)
+    tft.fillRoundRect(26, 130, 188, 42, 6, 0x2C9F);
+    tft.drawRoundRect(26, 130, 188, 42, 6, 0x07FF);
+    tft.setTextFont(2);
+    tft.setTextColor(TFT_WHITE, 0x2C9F);
+    tft.drawString("RESTART SYSTEM", 120, 144);
+    tft.setTextFont(1);
+    tft.setTextColor(0xE71C, 0x2C9F);
+    tft.drawString("Warm Reboot ESP32 OS", 120, 161);
+
+    // 3. Power Off / Deep Sleep (Y = 180..224)
+    tft.fillRoundRect(26, 180, 188, 42, 6, 0x9000);
+    tft.drawRoundRect(26, 180, 188, 42, 6, 0xF800);
+    tft.setTextFont(2);
+    tft.setTextColor(TFT_WHITE, 0x9000);
+    tft.drawString("POWER OFF", 120, 194);
+    tft.setTextFont(1);
+    tft.setTextColor(0xFFE0, 0x9000);
+    tft.drawString("Shutdown Services & Power Save", 120, 211);
+
+    // 4. Cancel (Y = 232..264)
+    tft.fillRoundRect(26, 232, 188, 32, 6, 0x18E3);
+    tft.drawRoundRect(26, 232, 188, 32, 6, 0x52AA);
+    tft.setTextFont(2);
+    tft.setTextColor(0x9CD3, 0x18E3);
+    tft.drawString("CANCEL", 120, 248);
+    tft.setTextDatum(TL_DATUM);
+}
+
+static void shutdownServicesAndDeepSleep() {
+    TFT_eSPI &tft = hal::getDisplay();
+    tft.fillScreen(0x0821);
+    tft.fillRoundRect(16, 108, 208, 92, 8, 0x10A2);
+    tft.drawRoundRect(16, 108, 208, 92, 8, 0xF800);
+    tft.setTextFont(2);
+    tft.setTextDatum(MC_DATUM);
+    tft.setTextColor(0xF800, 0x10A2);
+    tft.drawString("SHUTTING DOWN...", 120, 134);
+    tft.setTextFont(1);
+    tft.setTextColor(TFT_WHITE, 0x10A2);
+    tft.drawString("Stopping Wi-Fi, FS & Display", 120, 158);
+    tft.setTextColor(0x9CD3, 0x10A2);
+    tft.drawString("Entering ESP Deep Sleep Mode", 120, 176);
+    tft.setTextDatum(TL_DATUM);
+
+    hal::playTone(1200, 70);
+    delay(85);
+    hal::playTone(720, 110);
+    delay(130);
+    hal::stopTone();
+
+    Config::getInstance().save();
+    if (StorageHAL::isSDMounted()) {
+        core::Logger::syncToSD();
+    }
+    WiFi.disconnect(true);
+    WiFi.mode(WIFI_OFF);
+    btStop();
+    LittleFS.end();
+    SD.end();
+    hal::turnOffLED();
+
+    delay(350);
+    tft.fillScreen(TFT_BLACK);
+    tft.writecommand(0x10); // ST7789 SLPIN (Hardware Display Sleep)
+    hal::turnBacklightOff();
+
+    // Wait for BOOT button (GPIO 0) release before arming active-LOW wakeup
+    pinMode(0, INPUT_PULLUP);
+    uint32_t t0 = millis();
+    while (digitalRead(0) == LOW && (millis() - t0 < 3000)) {
+        delay(20);
+    }
+    delay(100);
+    esp_sleep_enable_ext0_wakeup(GPIO_NUM_0, 0);
+    esp_deep_sleep_start();
+}
+
 void UIManager::checkPowerAndSleep() {
     uint32_t now = millis();
 
     // 1. Hardware BOOT Button (GPIO 0) acts as Power / Sleep / Wake Button
-    if (hal::pollPowerButton()) {
+    hal::PowerButtonEvent pwrEv = hal::pollPowerButtonEvent();
+    if (pwrEv != hal::PowerButtonEvent::NONE) {
+        s_lastActivityMs = now;
+        if (s_screenAsleep) {
+            hal::beep(25);
+            lockScreen(false);
+            return;
+        }
+        if (pwrEv == hal::PowerButtonEvent::LONG_PRESS && !s_isLocked) {
+            s_powerMenuOpen = !s_powerMenuOpen;
+            hal::beep(55);
+            if (s_powerMenuOpen) {
+                if (s_isLandscape) setOrientation(false);
+                drawPowerMenu();
+            } else {
+                render(true);
+            }
+            return;
+        }
+        if (pwrEv == hal::PowerButtonEvent::SHORT_PRESS) {
+            hal::beep(25);
+            if (s_powerMenuOpen) {
+                s_powerMenuOpen = false;
+                render(true);
+            } else {
+                lockScreen(true);
+            }
+            return;
+        }
+    }
+    if (false && hal::pollPowerButton()) {
         s_lastActivityMs = now;
         hal::beep(25);
         if (!s_screenAsleep) {
@@ -607,6 +744,20 @@ void UIManager::pump() {
 void UIManager::handleNavAction(NavAction action) {
     switch (action) {
         case NavAction::BACK:
+            if (s_powerMenuOpen) {
+                s_powerMenuOpen = false;
+                hal::beep(20);
+                render(true);
+                return;
+            }
+            if (!core::DynamicScriptApp::isScriptRunning() && s_state == UIState::ACTIVE_APP && s_activeApp) {
+                if (s_activeApp->onBackPressed()) {
+                    hal::beep(25);
+                    render(false);
+                    return;
+                }
+            }
+            // fall through to HOME exit behavior
         case NavAction::HOME:
             if (core::DynamicScriptApp::isScriptRunning()) {
                 core::DynamicScriptApp::requestAbort();
@@ -667,6 +818,67 @@ void UIManager::routeTouchEvents() {
     // If Lock Screen is active, route all touches exclusively to Lock Screen / PIN pad
     if (s_isLocked) {
         handleLockScreenTouch(event);
+        return;
+    }
+    if (s_powerMenuOpen) {
+        if (event.state == hal::TouchState::DOWN) {
+            if (event.x >= 24 && event.x <= 216) {
+                if (event.y >= 80 && event.y <= 124) {
+                    s_powerMenuOpen = false;
+                    hal::beep(45);
+                    if (core::DynamicScriptApp::isScriptRunning()) {
+                        core::DynamicScriptApp::requestAbort();
+                    }
+                    if (s_state == UIState::ACTIVE_APP) {
+                        exitToHome();
+                    }
+                    core::AppRegistry::gc();
+                    core::AppRegistry::rescan();
+                    LauncherView::init();
+                    if (s_statusBarInstance) s_statusBarInstance->render(true);
+                    if (s_navBarInstance) {
+                        s_navBarInstance->clearPressedState();
+                        s_navBarInstance->render(true);
+                    }
+                    render(true);
+                    showToast("UI Daemon Restarted!", 1600);
+                    return;
+                }
+                if (event.y >= 130 && event.y <= 174) {
+                    s_powerMenuOpen = false;
+                    hal::beep(70);
+                    Config::getInstance().save();
+                    TFT_eSPI &tft = hal::getDisplay();
+                    tft.fillScreen(0x0821);
+                    tft.setTextFont(2);
+                    tft.setTextDatum(MC_DATUM);
+                    tft.setTextColor(0x07FF, 0x0821);
+                    tft.drawString("RESTARTING SYSTEM...", 120, 155);
+                    delay(400);
+                    ESP.restart();
+                    return;
+                }
+                if (event.y >= 180 && event.y <= 224) {
+                    s_powerMenuOpen = false;
+                    if (s_state == UIState::ACTIVE_APP) {
+                        exitToHome();
+                    }
+                    shutdownServicesAndDeepSleep();
+                    return;
+                }
+                if (event.y >= 232 && event.y <= 268) {
+                    s_powerMenuOpen = false;
+                    hal::beep(20);
+                    render(true);
+                    return;
+                }
+            }
+            if (event.y < 40 || event.y > 276) {
+                s_powerMenuOpen = false;
+                hal::beep(15);
+                render(true);
+            }
+        }
         return;
     }
 
@@ -903,6 +1115,7 @@ void UIManager::render(bool forceFullRedraw) {
             if (s_statusBarInstance) {
                 s_statusBarInstance->render(forceFullRedraw);
             }
+            if (s_powerMenuOpen) break;
             if (s_activeApp) {
                 int16_t vpW = tft.width();
                 int16_t vpH = tft.height() - STATUS_BAR_HEIGHT - NAV_BAR_HEIGHT;
@@ -986,6 +1199,7 @@ void UIManager::update() {
             core::AppRegistry::gc();
             if (s_retiredApp) { delete s_retiredApp; s_retiredApp = nullptr; }
             core::AppRegistry::gc();
+            if (s_powerMenuOpen) break;
             LauncherView::update();
             break;
         }
@@ -998,6 +1212,7 @@ void UIManager::update() {
                     s_statusBarInstance->render(false);
                 }
             }
+            if (s_powerMenuOpen) break;
             if (s_activeApp) {
                 s_activeApp->onUpdate();
                 if (s_state == UIState::ACTIVE_APP && s_activeApp && !s_isLocked && !s_screenAsleep) {

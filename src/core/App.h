@@ -113,6 +113,7 @@ public:
     // -------------------------------------------------------------
     // State Query
     // -------------------------------------------------------------
+    virtual bool onBackPressed() { return false; }
     AppState getState() const { return m_state; }
     bool isRunning() const { return m_state == AppState::RUNNING; }
 
