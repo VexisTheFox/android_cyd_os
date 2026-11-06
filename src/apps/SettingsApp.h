@@ -47,13 +47,18 @@ public:
 
 private:
     static constexpr int HEADER_H = 26;
+    static constexpr int ABOUT_CONTENT_H = 720;
 
     SettingsPage m_currentPage;
     bool         m_needsFullRedraw;
     bool         m_wasPressed;
     bool         m_isDraggingSlider;
+    bool         m_isDraggingScroll;
     uint16_t     m_lastTouchX;
     uint16_t     m_lastTouchY;
+    int16_t      m_touchStartY;
+    int16_t      m_scrollStartY;
+    int16_t      m_aboutScrollY;
     uint32_t     m_lastClockTickMs;
 
     uint8_t      m_brightness;

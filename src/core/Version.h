@@ -6,15 +6,15 @@
 #pragma once
 
 #ifndef CYDOS_VERSION_TAG
-#define CYDOS_VERSION_TAG "v1.0"
+#define CYDOS_VERSION_TAG "v1.0.0.1"
 #endif
 
 #ifndef CYDOS_VERSION_STR
-#define CYDOS_VERSION_STR "1.0"
+#define CYDOS_VERSION_STR "1.0.0.1"
 #endif
 
 #ifndef CYDOS_FULL_NAME
-#define CYDOS_FULL_NAME "cydOS V1.0"
+#define CYDOS_FULL_NAME "cydOS V1.0.0.1"
 #endif
 
 #define CYDOS_OS_NAME       "cydOS"

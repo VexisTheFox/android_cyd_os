@@ -15,6 +15,7 @@
 #include <esp_ota_ops.h>
 #include <cstring>
 #include <cstdio>
+#include <cstdlib>
 
 namespace apps {
 
@@ -36,8 +37,12 @@ SettingsApp::SettingsApp()
     , m_needsFullRedraw(true)
     , m_wasPressed(false)
     , m_isDraggingSlider(false)
+    , m_isDraggingScroll(false)
     , m_lastTouchX(0)
     , m_lastTouchY(0)
+    , m_touchStartY(0)
+    , m_scrollStartY(0)
+    , m_aboutScrollY(0)
     , m_lastClockTickMs(0)
     , m_brightness(80)
     , m_ledState(0)
@@ -75,14 +80,13 @@ void SettingsApp::refreshCachedStatus() {
     m_cachedWifiConn     = (WiFi.status() == WL_CONNECTED);
 
     if (m_cachedWifiConn) {
-        snprintf(m_cachedWifiLine, sizeof(m_cachedWifiLine), "Connected: %.14s (%ddBm)",
-                 WiFi.SSID().c_str(), (int)WiFi.RSSI());
+        snprintf(m_cachedWifiLine, sizeof(m_cachedWifiLine), "Connected: %.12s", WiFi.SSID().c_str());
     } else if (m_wifiEnabled && m_wifiSsid[0] != '\0') {
-        snprintf(m_cachedWifiLine, sizeof(m_cachedWifiLine), "Saved: %.22s (Idle)", m_wifiSsid);
+        snprintf(m_cachedWifiLine, sizeof(m_cachedWifiLine), "Saved: %.16s", m_wifiSsid);
     } else if (m_wifiEnabled) {
-        strncpy(m_cachedWifiLine, "Wi-Fi Enabled (Not Connected)", sizeof(m_cachedWifiLine) - 1);
+        strncpy(m_cachedWifiLine, "Wi-Fi Enabled (Idle)", sizeof(m_cachedWifiLine) - 1);
     } else {
-        strncpy(m_cachedWifiLine, "Wi-Fi Radio Off", sizeof(m_cachedWifiLine) - 1);
+        strncpy(m_cachedWifiLine, "Wi-Fi Off", sizeof(m_cachedWifiLine) - 1);
     }
     m_cachedWifiLine[sizeof(m_cachedWifiLine) - 1] = '\0';
 
@@ -114,20 +118,20 @@ void SettingsApp::onResume() {
     m_logsJustDeleted  = false;
     m_confirmReset     = false;
     m_isDraggingSlider = false;
+    m_isDraggingScroll = false;
     m_wasPressed       = false;
+    m_aboutScrollY     = 0;
     refreshCachedStatus();
-    m_needsFullRedraw = true;
+    m_needsFullRedraw  = true;
 }
 
 void SettingsApp::onUpdate() {
-    // Live clock / uptime tick once per second on Region & Time or About cydOS page
-    if (m_currentPage == SettingsPage::REGION_TIME || m_currentPage == SettingsPage::ABOUT) {
+    // Live clock update once per second ONLY on Region & Time page
+    // About page intentionally does NOT auto-refresh every second to prevent screen blinking!
+    if (m_currentPage == SettingsPage::REGION_TIME) {
         uint32_t now = millis();
         if (now - m_lastClockTickMs >= 1000) {
             m_lastClockTickMs = now;
-            if (m_currentPage == SettingsPage::ABOUT) {
-                refreshCachedStatus();
-            }
             m_needsFullRedraw = true;
         }
     }
@@ -135,6 +139,7 @@ void SettingsApp::onUpdate() {
 
 void SettingsApp::scrollToAbout() {
     refreshCachedStatus();
+    m_aboutScrollY = 0;
     m_currentPage = SettingsPage::ABOUT;
     m_needsFullRedraw = true;
 }
@@ -142,6 +147,7 @@ void SettingsApp::scrollToAbout() {
 bool SettingsApp::onBackPressed() {
     if (m_currentPage != SettingsPage::MAIN_MENU) {
         m_confirmReset = false;
+        m_aboutScrollY = 0;
         refreshCachedStatus();
         m_currentPage = SettingsPage::MAIN_MENU;
         m_needsFullRedraw = true;
@@ -153,6 +159,7 @@ bool SettingsApp::onBackPressed() {
 void SettingsApp::openPage(SettingsPage page) {
     m_confirmReset = false;
     m_logsJustDeleted = false;
+    m_aboutScrollY = 0;
     refreshCachedStatus();
     m_currentPage = page;
     m_needsFullRedraw = true;
@@ -326,29 +333,25 @@ void SettingsApp::drawMainMenu(TFT_eSPI &display, int vx, int vy, int vw, int vh
     int bodyH = vh - HEADER_H;
     display.fillRect(vx, bodyY, vw, bodyH, COLOR_BG);
 
-    char subDisplay[44];
+    // Keep all subtitles strictly under 25 chars (~150 px) so they NEVER overflow card boundaries!
+    char subDisplay[32];
     if (m_sleepTimeoutSec == 0) {
-        snprintf(subDisplay, sizeof(subDisplay), "Bright %u%% | Sleep Never | Snd %s",
-                 m_brightness, m_soundEnabled ? "ON" : "OFF");
+        snprintf(subDisplay, sizeof(subDisplay), "Bright %u%% | Sleep Never", m_brightness);
     } else {
-        snprintf(subDisplay, sizeof(subDisplay), "Bright %u%% | Sleep %us | Snd %s",
-                 m_brightness, (unsigned)m_sleepTimeoutSec, m_soundEnabled ? "ON" : "OFF");
+        snprintf(subDisplay, sizeof(subDisplay), "Bright %u%% | Sleep %us", m_brightness, (unsigned)m_sleepTimeoutSec);
     }
 
-    char subSec[40];
+    char subSec[32];
     if (m_pinEnabled) {
-        snprintf(subSec, sizeof(subSec), "PIN Lock Enabled (%s)", m_pinCode);
+        snprintf(subSec, sizeof(subSec), "PIN Protected (%s)", m_pinCode);
     } else {
-        strncpy(subSec, "Swipe / Tap Unlock Only", sizeof(subSec) - 1);
+        strncpy(subSec, "Swipe / Tap to Unlock", sizeof(subSec) - 1);
         subSec[sizeof(subSec) - 1] = '\0';
     }
 
-    char subSys[44];
-    snprintf(subSys, sizeof(subSys), "Free %luKB | Flash %lu/%luKB | %s",
-             (unsigned long)m_cachedRamKb,
-             (unsigned long)m_cachedFlashUsedKb,
-             (unsigned long)m_cachedFlashTotalKb,
-             m_devModeEnabled ? "DIAG" : "STBL");
+    char subSys[32];
+    snprintf(subSys, sizeof(subSys), "RAM %luKB | Flash %luKB",
+             (unsigned long)m_cachedRamKb, (unsigned long)m_cachedFlashUsedKb);
 
     struct CatRow {
         const char* title;
@@ -358,13 +361,13 @@ void SettingsApp::drawMainMenu(TFT_eSPI &display, int vx, int vy, int vw, int vh
     };
 
     CatRow rows[7] = {
-        { "Wi-Fi & Network",     m_cachedWifiLine,                      0x0276, "W" },
-        { "Display & Sound",     subDisplay,                            0x6815, "D" },
-        { "Security & PIN Lock", subSec,                                0x04D3, "S" },
-        { "Region & Date/Time",  m_cachedRegionLine,                    0x2C9F, "T" },
-        { "System & Logs",       subSys,                                0x9175, "M" },
-        { "OTA Update & Reset",  "GitHub Firmware OTA & Factory Wipe",  0xD8A7, "U" },
-        { "About cydOS",         CYDOS_FULL_NAME " Stable | Hardware & Info", 0x04A0, "i" }
+        { "Wi-Fi & Network",     m_cachedWifiLine,                0x0276, "W" },
+        { "Display & Sound",     subDisplay,                      0x6815, "D" },
+        { "Security & PIN Lock", subSec,                          0x04D3, "S" },
+        { "Region & Date/Time",  m_cachedRegionLine,              0x2C9F, "T" },
+        { "System & Logs",       subSys,                          0x9175, "M" },
+        { "OTA Update & Reset",  "Firmware Update & Reset",       0xD8A7, "U" },
+        { "About cydOS",         "Version 1.0.0.1 & Device Info", 0x04A0, "i" }
     };
 
     const int rowH = 33;
@@ -392,7 +395,7 @@ void SettingsApp::drawMainMenu(TFT_eSPI &display, int vx, int vy, int vw, int vh
         display.setTextColor(COLOR_WHITE, COLOR_CARD);
         display.drawString(rows[i].title, vx + 42, curY + 2);
 
-        // Live Subtitle
+        // Subtitle (concise & guaranteed within 168 px)
         display.setTextFont(1);
         display.setTextColor(COLOR_MUTED, COLOR_CARD);
         display.drawString(rows[i].sub, vx + 42, curY + 21);
@@ -415,7 +418,7 @@ void SettingsApp::drawWifiPage(TFT_eSPI &display, int vx, int vy, int vw, int vh
     int cardX = vx + 6;
     int cardW = vw - 12;
 
-    // 1. Radio & Status Card (Y = bodyY + 4, H = 44)
+    // 1. Radio & Status Card
     int y1 = bodyY + 4;
     display.fillRoundRect(cardX, y1, cardW, 44, 6, COLOR_CARD);
     display.drawRoundRect(cardX, y1, cardW, 44, 6, COLOR_DIVIDER);
@@ -435,7 +438,7 @@ void SettingsApp::drawWifiPage(TFT_eSPI &display, int vx, int vy, int vw, int vh
     display.setTextColor(m_cachedWifiConn ? COLOR_GREEN : COLOR_AMBER, COLOR_CARD);
     display.drawString(m_cachedWifiLine, cardX + 8, y1 + 28);
 
-    // 2. Credentials Card (Y = bodyY + 52, H = 62)
+    // 2. Credentials Card
     int y2 = bodyY + 52;
     display.fillRoundRect(cardX, y2, cardW, 62, 6, COLOR_CARD);
     display.drawRoundRect(cardX, y2, cardW, 62, 6, COLOR_DIVIDER);
@@ -443,29 +446,29 @@ void SettingsApp::drawWifiPage(TFT_eSPI &display, int vx, int vy, int vw, int vh
     // SSID Input Box
     display.fillRoundRect(cardX + 6, y2 + 5, cardW - 12, 24, 4, 0x0821);
     display.drawRoundRect(cardX + 6, y2 + 5, cardW - 12, 24, 4, COLOR_CYAN);
-    char ssidStr[44];
-    snprintf(ssidStr, sizeof(ssidStr), "SSID: %s", (m_wifiSsid[0] != '\0') ? m_wifiSsid : "<Tap to type>");
+    char ssidStr[40];
+    snprintf(ssidStr, sizeof(ssidStr), "SSID: %.18s", (m_wifiSsid[0] != '\0') ? m_wifiSsid : "<Tap to type>");
     display.setTextColor(COLOR_WHITE, 0x0821);
-    display.drawString(ssidStr, cardX + 12, y2 + 13);
+    display.drawString(ssidStr, cardX + 10, y2 + 13);
 
     // Password Input Box
     display.fillRoundRect(cardX + 6, y2 + 33, cardW - 12, 24, 4, 0x0821);
     display.drawRoundRect(cardX + 6, y2 + 33, cardW - 12, 24, 4, COLOR_DIVIDER);
-    char passStr[48];
+    char passStr[40];
     if (m_wifiPass[0] == '\0') {
         strcpy(passStr, "PASS: <Open / Tap to enter>");
     } else {
         size_t len = strlen(m_wifiPass);
-        if (len > 14) len = 14;
-        char stars[16];
+        if (len > 12) len = 12;
+        char stars[14];
         memset(stars, '*', len);
         stars[len] = '\0';
         snprintf(passStr, sizeof(passStr), "PASS: %s (%u chars)", stars, (unsigned)strlen(m_wifiPass));
     }
     display.setTextColor(COLOR_MUTED, 0x0821);
-    display.drawString(passStr, cardX + 12, y2 + 41);
+    display.drawString(passStr, cardX + 10, y2 + 41);
 
-    // 3. Action Buttons Row (Y = bodyY + 118, H = 28)
+    // 3. Action Buttons Row
     int y3 = bodyY + 118;
     display.fillRoundRect(cardX, y3, 110, 28, 5, 0x04D3);
     display.drawRoundRect(cardX, y3, 110, 28, 5, COLOR_GREEN);
@@ -478,7 +481,7 @@ void SettingsApp::drawWifiPage(TFT_eSPI &display, int vx, int vy, int vw, int vh
     display.setTextColor(COLOR_CYAN, 0x2166);
     display.drawString("SCAN NETWORKS", cardX + 116 + (cardW - 116) / 2, y3 + 14);
 
-    // 4. Scanned Networks List Card (Y = bodyY + 150, H = 94)
+    // 4. Scanned Networks List Card
     int y4 = bodyY + 150;
     display.fillRoundRect(cardX, y4, cardW, 94, 6, COLOR_CARD);
     display.drawRoundRect(cardX, y4, cardW, 94, 6, COLOR_DIVIDER);
@@ -495,13 +498,12 @@ void SettingsApp::drawWifiPage(TFT_eSPI &display, int vx, int vy, int vw, int vh
             int ry = y4 + 18 + i * 24;
             display.fillRoundRect(cardX + 6, ry, cardW - 12, 21, 4, 0x10A2);
             display.drawRoundRect(cardX + 6, ry, cardW - 12, 21, 4, COLOR_DIVIDER);
-            char netLine[44];
-            snprintf(netLine, sizeof(netLine), "%u. %.18s (%lddBm)%s",
-                     (unsigned)(i + 1), m_scanSsids[i], (long)m_scanRssi[i],
-                     m_scanOpen[i] ? " [OPEN]" : " [WPA]");
+            char netLine[36];
+            snprintf(netLine, sizeof(netLine), "%u. %.14s (%lddBm)",
+                     (unsigned)(i + 1), m_scanSsids[i], (long)m_scanRssi[i]);
             display.setTextDatum(TL_DATUM);
             display.setTextColor(COLOR_WHITE, 0x10A2);
-            display.drawString(netLine, cardX + 12, ry + 6);
+            display.drawString(netLine, cardX + 10, ry + 6);
         }
     }
     display.setTextDatum(TL_DATUM);
@@ -514,7 +516,7 @@ void SettingsApp::drawDisplaySoundPage(TFT_eSPI &display, int vx, int vy, int vw
     int cardX = vx + 6;
     int cardW = vw - 12;
 
-    // 1. Brightness Card (Y = bodyY + 6, H = 58)
+    // 1. Brightness Card
     int y1 = bodyY + 6;
     display.fillRoundRect(cardX, y1, cardW, 58, 6, COLOR_CARD);
     display.drawRoundRect(cardX, y1, cardW, 58, 6, COLOR_DIVIDER);
@@ -553,17 +555,17 @@ void SettingsApp::drawDisplaySoundPage(TFT_eSPI &display, int vx, int vy, int vw
     display.setTextColor(COLOR_WHITE, 0x10A2);
     display.drawString("+", cardX + cardW - 25, y1 + 36);
 
-    // 2. Auto-Sleep Timeout Card (Y = bodyY + 70, H = 54)
+    // 2. Auto-Sleep Timeout Card
     int y2 = bodyY + 70;
     display.fillRoundRect(cardX, y2, cardW, 54, 6, COLOR_CARD);
     display.drawRoundRect(cardX, y2, cardW, 54, 6, COLOR_DIVIDER);
     display.setTextFont(1);
     display.setTextDatum(TL_DATUM);
     display.setTextColor(COLOR_CYAN, COLOR_CARD);
-    display.drawString("AUTO-SLEEP TIMEOUT (BOOT = WAKE/SLEEP)", cardX + 8, y2 + 6);
+    display.drawString("AUTO-SLEEP (BOOT = WAKE/SLEEP)", cardX + 8, y2 + 6);
 
     const uint16_t presets[5] = { 15, 30, 60, 120, 0 };
-    const char* labels[5]     = { "15s", "30s", "1m", "2m", "NEVER" };
+    const char* labels[5]     = { "15s", "30s", "1m", "2m", "OFF" };
     for (int i = 0; i < 5; i++) {
         int bx = cardX + 8 + i * 43;
         bool active = (m_sleepTimeoutSec == presets[i]);
@@ -576,7 +578,7 @@ void SettingsApp::drawDisplaySoundPage(TFT_eSPI &display, int vx, int vy, int vw
         display.drawString(labels[i], bx + 19, y2 + 34);
     }
 
-    // 3. System Touch Sound Card (Y = bodyY + 130, H = 48)
+    // 3. System Touch Sound Card
     int y3 = bodyY + 130;
     display.fillRoundRect(cardX, y3, cardW, 48, 6, COLOR_CARD);
     display.drawRoundRect(cardX, y3, cardW, 48, 6, COLOR_DIVIDER);
@@ -586,7 +588,7 @@ void SettingsApp::drawDisplaySoundPage(TFT_eSPI &display, int vx, int vy, int vw
     display.drawString("System Touch Audio", cardX + 8, y3 + 6);
     display.setTextFont(1);
     display.setTextColor(COLOR_MUTED, COLOR_CARD);
-    display.drawString("Piezo speaker clicks & alerts", cardX + 8, y3 + 27);
+    display.drawString("Piezo clicks & alert tones", cardX + 8, y3 + 27);
 
     uint16_t sndCol = m_soundEnabled ? COLOR_GREEN : 0x4208;
     display.fillRoundRect(cardX + cardW - 68, y3 + 12, 60, 24, 12, sndCol);
@@ -594,7 +596,7 @@ void SettingsApp::drawDisplaySoundPage(TFT_eSPI &display, int vx, int vy, int vw
     display.setTextColor(m_soundEnabled ? TFT_BLACK : COLOR_WHITE, sndCol);
     display.drawString(m_soundEnabled ? "SOUND ON" : "MUTED", cardX + cardW - 38, y3 + 24);
 
-    // 4. Onboard RGB LED Control Card (Y = bodyY + 184, H = 56)
+    // 4. Onboard RGB LED Control Card
     int y4 = bodyY + 184;
     display.fillRoundRect(cardX, y4, cardW, 56, 6, COLOR_CARD);
     display.drawRoundRect(cardX, y4, cardW, 56, 6, COLOR_DIVIDER);
@@ -623,7 +625,7 @@ void SettingsApp::drawSecurityPage(TFT_eSPI &display, int vx, int vy, int vw, in
     int cardX = vx + 6;
     int cardW = vw - 12;
 
-    // 1. PIN Lock Switch Card (Y = bodyY + 8, H = 58)
+    // 1. PIN Lock Switch Card
     int y1 = bodyY + 8;
     display.fillRoundRect(cardX, y1, cardW, 58, 6, COLOR_CARD);
     display.drawRoundRect(cardX, y1, cardW, 58, 6, COLOR_DIVIDER);
@@ -633,7 +635,7 @@ void SettingsApp::drawSecurityPage(TFT_eSPI &display, int vx, int vy, int vw, in
     display.drawString("4-Digit PIN Lock", cardX + 10, y1 + 8);
     display.setTextFont(1);
     display.setTextColor(COLOR_MUTED, COLOR_CARD);
-    display.drawString(m_pinEnabled ? "Required on boot & screen wake" : "Unlocked by upward swipe or tap",
+    display.drawString(m_pinEnabled ? "PIN required on boot & wake" : "Swipe up or tap to unlock",
                        cardX + 10, y1 + 32);
 
     uint16_t pCol = m_pinEnabled ? COLOR_GREEN : 0x4208;
@@ -642,7 +644,7 @@ void SettingsApp::drawSecurityPage(TFT_eSPI &display, int vx, int vy, int vw, in
     display.setTextColor(m_pinEnabled ? TFT_BLACK : COLOR_WHITE, pCol);
     display.drawString(m_pinEnabled ? "ENABLED" : "OFF", cardX + cardW - 38, y1 + 29);
 
-    // 2. PIN Code Configuration Card (Y = bodyY + 74, H = 74)
+    // 2. PIN Code Configuration Card
     int y2 = bodyY + 74;
     display.fillRoundRect(cardX, y2, cardW, 74, 6, COLOR_CARD);
     display.drawRoundRect(cardX, y2, cardW, 74, 6, COLOR_DIVIDER);
@@ -650,7 +652,7 @@ void SettingsApp::drawSecurityPage(TFT_eSPI &display, int vx, int vy, int vw, in
     display.setTextColor(COLOR_CYAN, COLOR_CARD);
     display.drawString("ACTIVE SECURITY PIN CODE", cardX + 10, y2 + 8);
 
-    char pinInfo[36];
+    char pinInfo[32];
     snprintf(pinInfo, sizeof(pinInfo), "Current PIN:  %s", m_pinCode);
     display.setTextFont(2);
     display.setTextColor(COLOR_AMBER, COLOR_CARD);
@@ -663,7 +665,7 @@ void SettingsApp::drawSecurityPage(TFT_eSPI &display, int vx, int vy, int vw, in
     display.setTextColor(COLOR_WHITE, 0x2166);
     display.drawString("CHANGE 4-DIGIT PIN (KEYBOARD)", cardX + cardW / 2, y2 + 56);
 
-    // 3. Quick Lock & Sleep Actions Card (Y = bodyY + 156, H = 82)
+    // 3. Quick Lock & Sleep Actions Card
     int y3 = bodyY + 156;
     display.fillRoundRect(cardX, y3, cardW, 82, 6, COLOR_CARD);
     display.drawRoundRect(cardX, y3, cardW, 82, 6, COLOR_DIVIDER);
@@ -692,7 +694,7 @@ void SettingsApp::drawRegionTimePage(TFT_eSPI &display, int vx, int vy, int vw, 
     int cardX = vx + 6;
     int cardW = vw - 12;
 
-    // 1. Live Clock Card (Y = bodyY + 8, H = 68)
+    // 1. Live Clock Card
     int y1 = bodyY + 8;
     display.fillRoundRect(cardX, y1, cardW, 68, 6, COLOR_CARD);
     display.drawRoundRect(cardX, y1, cardW, 68, 6, COLOR_DIVIDER);
@@ -707,10 +709,10 @@ void SettingsApp::drawRegionTimePage(TFT_eSPI &display, int vx, int vy, int vw, 
     display.setTextFont(1);
     bool synced = core::TimeService::isSynced();
     display.setTextColor(synced ? COLOR_GREEN : COLOR_AMBER, COLOR_CARD);
-    display.drawString(synced ? "NTP Status: Synchronized via Wi-Fi" : "NTP Status: Unsynced (Local Uptime Clock)",
+    display.drawString(synced ? "NTP Status: Synchronized (Wi-Fi)" : "NTP Status: Unsynced (Local Uptime)",
                        vx + vw / 2, y1 + 54);
 
-    // 2. Region & Timezone Card (Y = bodyY + 84, H = 76)
+    // 2. Region & Timezone Card
     int y2 = bodyY + 84;
     display.fillRoundRect(cardX, y2, cardW, 76, 6, COLOR_CARD);
     display.drawRoundRect(cardX, y2, cardW, 76, 6, COLOR_DIVIDER);
@@ -727,15 +729,15 @@ void SettingsApp::drawRegionTimePage(TFT_eSPI &display, int vx, int vy, int vw, 
     display.setTextFont(1);
     display.setTextDatum(MC_DATUM);
     display.setTextColor(COLOR_WHITE, 0x2166);
-    display.drawString("CHANGE REGION (CZECHIA, USA, UK...)", cardX + cardW / 2, y2 + 58);
+    display.drawString("CHANGE REGION (CZECHIA, USA...)", cardX + cardW / 2, y2 + 58);
 
-    // 3. Sync NTP Now Card (Y = bodyY + 168, H = 64)
+    // 3. Sync NTP Now Card
     int y3 = bodyY + 168;
     display.fillRoundRect(cardX, y3, cardW, 64, 6, COLOR_CARD);
     display.drawRoundRect(cardX, y3, cardW, 64, 6, COLOR_DIVIDER);
     display.setTextDatum(TL_DATUM);
     display.setTextColor(COLOR_MUTED, COLOR_CARD);
-    display.drawString("Fetches exact UTC time from pool.ntp.org", cardX + 10, y3 + 10);
+    display.drawString("Fetches UTC time from pool.ntp.org", cardX + 10, y3 + 10);
 
     display.fillRoundRect(cardX + 10, y3 + 28, cardW - 20, 28, 5, 0x04D3);
     display.drawRoundRect(cardX + 10, y3 + 28, cardW - 20, 28, 5, COLOR_GREEN);
@@ -753,7 +755,7 @@ void SettingsApp::drawSystemLogsPage(TFT_eSPI &display, int vx, int vy, int vw, 
     int cardX = vx + 6;
     int cardW = vw - 12;
 
-    // 1. Hardware & Memory Telemetry Card (Y = bodyY + 6, H = 64)
+    // 1. Hardware & Memory Telemetry Card
     int y1 = bodyY + 6;
     display.fillRoundRect(cardX, y1, cardW, 64, 6, COLOR_CARD);
     display.drawRoundRect(cardX, y1, cardW, 64, 6, COLOR_DIVIDER);
@@ -762,23 +764,23 @@ void SettingsApp::drawSystemLogsPage(TFT_eSPI &display, int vx, int vy, int vw, 
     display.setTextColor(COLOR_CYAN, COLOR_CARD);
     display.drawString("MEMORY & FILESYSTEM TELEMETRY", cardX + 8, y1 + 6);
 
-    char line1[44];
-    snprintf(line1, sizeof(line1), "Free RAM: %lu KB (Max Block: %lu KB)",
+    char line1[36];
+    snprintf(line1, sizeof(line1), "Free RAM: %luKB (Max: %luKB)",
              (unsigned long)m_cachedRamKb, (unsigned long)m_cachedMaxBlockKb);
     display.setTextColor(COLOR_WHITE, COLOR_CARD);
     display.drawString(line1, cardX + 8, y1 + 22);
 
-    char line2[44];
-    snprintf(line2, sizeof(line2), "Flash: %lu / %lu KB | SD: %s",
+    char line2[36];
+    snprintf(line2, sizeof(line2), "Flash: %lu/%luKB | SD: %s",
              (unsigned long)m_cachedFlashUsedKb, (unsigned long)m_cachedFlashTotalKb,
-             StorageHAL::isSDMounted() ? "MOUNTED" : "NOT DETECTED");
+             StorageHAL::isSDMounted() ? "YES" : "NO");
     display.setTextColor(COLOR_MUTED, COLOR_CARD);
     display.drawString(line2, cardX + 8, y1 + 36);
 
     display.setTextColor(COLOR_GREEN, COLOR_CARD);
     display.drawString("Lazy App & C-Module Loader: ACTIVE", cardX + 8, y1 + 50);
 
-    // 2. Diagnostics Mode Card (Y = bodyY + 76, H = 44)
+    // 2. Diagnostics Mode Card
     int y2 = bodyY + 76;
     display.fillRoundRect(cardX, y2, cardW, 44, 6, COLOR_CARD);
     display.drawRoundRect(cardX, y2, cardW, 44, 6, COLOR_DIVIDER);
@@ -795,7 +797,7 @@ void SettingsApp::drawSystemLogsPage(TFT_eSPI &display, int vx, int vy, int vw, 
     display.setTextColor(m_devModeEnabled ? TFT_BLACK : COLOR_WHITE, devCol);
     display.drawString(m_devModeEnabled ? "ON" : "OFF", cardX + cardW - 36, y2 + 22);
 
-    // 3. Kernel Log Filters & Actions Card (Y = bodyY + 126, H = 114)
+    // 3. Kernel Log Filters & Actions Card
     int y3 = bodyY + 126;
     display.fillRoundRect(cardX, y3, cardW, 114, 6, COLOR_CARD);
     display.drawRoundRect(cardX, y3, cardW, 114, 6, COLOR_DIVIDER);
@@ -803,7 +805,6 @@ void SettingsApp::drawSystemLogsPage(TFT_eSPI &display, int vx, int vy, int vw, 
     display.setTextColor(COLOR_CYAN, COLOR_CARD);
     display.drawString("KERNEL LOGGER (/logs/kernel.log)", cardX + 8, y3 + 6);
 
-    // Filter pills: INFO, WARN, ERR/FATAL
     uint16_t infoBg = m_logInfoEnabled ? COLOR_GREEN : 0x4208;
     display.fillRoundRect(cardX + 8, y3 + 22, 66, 24, 4, infoBg);
     display.setTextDatum(MC_DATUM);
@@ -820,7 +821,6 @@ void SettingsApp::drawSystemLogsPage(TFT_eSPI &display, int vx, int vy, int vw, 
     display.setTextColor(COLOR_WHITE, 0x3800);
     display.drawString("ERR: LOCKED", cardX + 186, y3 + 34);
 
-    // Export to SD & Delete Logs buttons
     display.fillRoundRect(cardX + 8, y3 + 54, 102, 26, 5, 0x2166);
     display.drawRoundRect(cardX + 8, y3 + 54, 102, 26, 5, COLOR_CYAN);
     display.setTextColor(COLOR_WHITE, 0x2166);
@@ -834,7 +834,7 @@ void SettingsApp::drawSystemLogsPage(TFT_eSPI &display, int vx, int vy, int vw, 
 
     display.setTextDatum(TL_DATUM);
     display.setTextColor(COLOR_MUTED, COLOR_CARD);
-    display.drawString("Tip: Hold BOOT button on Home for Power Menu", cardX + 8, y3 + 92);
+    display.drawString("Hold BOOT on Home for Power Menu", cardX + 8, y3 + 92);
 }
 
 void SettingsApp::drawUpdateResetPage(TFT_eSPI &display, int vx, int vy, int vw, int vh) {
@@ -844,24 +844,24 @@ void SettingsApp::drawUpdateResetPage(TFT_eSPI &display, int vx, int vy, int vw,
     int cardX = vx + 6;
     int cardW = vw - 12;
 
-    // 1. Current Release Summary Card (Y = bodyY + 6, H = 66)
+    // 1. Current Release Summary Card
     int y1 = bodyY + 6;
     display.fillRoundRect(cardX, y1, cardW, 66, 6, COLOR_CARD);
     display.drawRoundRect(cardX, y1, cardW, 66, 6, COLOR_DIVIDER);
     display.setTextFont(2);
     display.setTextDatum(TL_DATUM);
     display.setTextColor(COLOR_ANDR_GRN, COLOR_CARD);
-    display.drawString(CYDOS_FULL_NAME " (" CYDOS_BUILD_CHANNEL ")", cardX + 8, y1 + 5);
+    display.drawString(CYDOS_FULL_NAME " (Stable)", cardX + 8, y1 + 5);
 
     display.setTextFont(1);
     display.setTextColor(COLOR_WHITE, COLOR_CARD);
-    display.drawString("Board: ESP32-2432S028 (240MHz Dual-Core)", cardX + 8, y1 + 25);
+    display.drawString("Board: ESP32-2432S028 (CYD 2-USB)", cardX + 8, y1 + 25);
     display.setTextColor(COLOR_CYAN, COLOR_CARD);
-    display.drawString("GitHub: " CYDOS_GITHUB_REPO, cardX + 8, y1 + 39);
+    display.drawString("Repo: " CYDOS_GITHUB_REPO, cardX + 8, y1 + 39);
     display.setTextColor(COLOR_MUTED, COLOR_CARD);
     display.drawString("Recovery: Hold [BOOT] on startup", cardX + 8, y1 + 52);
 
-    // 2. GitHub OTA Firmware Update Card (Y = bodyY + 78, H = 78)
+    // 2. GitHub OTA Firmware Update Card
     int y2 = bodyY + 78;
     display.fillRoundRect(cardX, y2, cardW, 78, 6, COLOR_CARD);
     display.drawRoundRect(cardX, y2, cardW, 78, 6, COLOR_DIVIDER);
@@ -877,7 +877,7 @@ void SettingsApp::drawUpdateResetPage(TFT_eSPI &display, int vx, int vy, int vw,
     display.setTextColor(COLOR_WHITE, 0x0352);
     display.drawString("INSTALL OTA UPDATE (RECOVERY)", cardX + cardW / 2, y2 + 59);
 
-    // 3. Factory Reset Card (Y = bodyY + 162, H = 78)
+    // 3. Factory Reset Card
     int y3 = bodyY + 162;
     display.fillRoundRect(cardX, y3, cardW, 78, 6, COLOR_CARD);
     display.drawRoundRect(cardX, y3, cardW, 78, 6, COLOR_DIVIDER);
@@ -899,112 +899,158 @@ void SettingsApp::drawUpdateResetPage(TFT_eSPI &display, int vx, int vy, int vw,
     display.setTextDatum(TL_DATUM);
 }
 
+// ============================================================================
+// SCROLLABLE ABOUT PAGE WITH LARGE TEXT & TELEMETRY
+// ============================================================================
+
 void SettingsApp::drawAboutPage(TFT_eSPI &display, int vx, int vy, int vw, int vh) {
     int bodyY = vy + HEADER_H;
     int bodyH = vh - HEADER_H;
-    display.fillRect(vx, bodyY, vw, bodyH, COLOR_BG);
-    int cardX = vx + 6;
+    int maxScroll = ABOUT_CONTENT_H - bodyH;
+    if (maxScroll < 0) maxScroll = 0;
+    if (m_aboutScrollY > maxScroll) m_aboutScrollY = maxScroll;
+    if (m_aboutScrollY < 0) m_aboutScrollY = 0;
+
+    display.setViewport(vx, bodyY, vw, bodyH);
+    display.fillRect(0, 0, vw, bodyH, COLOR_BG);
+
+    int cardX = 6;
     int cardW = vw - 12;
 
-    // 1. OS Identity & Build Card (Y = bodyY + 4, H = 66)
-    int y1 = bodyY + 4;
-    display.fillRoundRect(cardX, y1, cardW, 66, 6, COLOR_CARD);
-    display.drawRoundRect(cardX, y1, cardW, 66, 6, COLOR_ANDR_GRN);
+    // Helper lambda to draw a neat Label (Font 1) + Big Value (Font 2) row
+    auto drawBigRow = [&](int y, const char* label, const char* val, uint16_t valColor) {
+        display.setTextDatum(TL_DATUM);
+        display.setTextFont(1);
+        display.setTextColor(COLOR_MUTED, COLOR_CARD);
+        display.drawString(label, cardX + 10, y);
 
-    display.setTextFont(2);
+        display.setTextFont(2);
+        display.setTextColor(valColor, COLOR_CARD);
+        display.drawString(val, cardX + 10, y + 11);
+    };
+
+    // ------------------------------------------------------------------------
+    // CARD 1: OS Information & Software Identity (Large Text)
+    // ------------------------------------------------------------------------
+    int c1Y = 6 - m_aboutScrollY;
+    int c1H = 200;
+    display.fillRoundRect(cardX, c1Y, cardW, c1H, 6, COLOR_CARD);
+    display.drawRoundRect(cardX, c1Y, cardW, c1H, 6, COLOR_ANDR_GRN);
+
+    // Title & Channel Badge
     display.setTextDatum(TL_DATUM);
+    display.setTextFont(4);
     display.setTextColor(COLOR_ANDR_GRN, COLOR_CARD);
-    display.drawString(CYDOS_FULL_NAME, cardX + 8, y1 + 4);
+    display.drawString("cydOS", cardX + 10, c1Y + 6);
 
-    // STABLE pill badge
-    display.fillRoundRect(cardX + cardW - 56, y1 + 5, 48, 16, 8, COLOR_ANDR_GRN);
+    display.fillRoundRect(cardX + cardW - 74, c1Y + 8, 66, 18, 9, COLOR_ANDR_GRN);
     display.setTextFont(1);
     display.setTextDatum(MC_DATUM);
     display.setTextColor(TFT_BLACK, COLOR_ANDR_GRN);
-    display.drawString("STABLE", cardX + cardW - 32, y1 + 13);
+    display.drawString("STABLE", cardX + cardW - 41, c1Y + 17);
+
+    display.drawFastHLine(cardX + 8, c1Y + 36, cardW - 16, COLOR_DIVIDER);
+
+    drawBigRow(c1Y + 42,  "SYSTEM VERSION", CYDOS_FULL_NAME, COLOR_WHITE);
+    drawBigRow(c1Y + 74,  "BUILD CHANNEL",  CYDOS_BUILD_CHANNEL " (OTA Active)", COLOR_GREEN);
+    drawBigRow(c1Y + 106, "OS ARCHITECTURE","Android Compatible UI Shell", COLOR_WHITE);
+    drawBigRow(c1Y + 138, "AUTHOR / OWNER", CYDOS_AUTHOR, COLOR_AMBER);
+    drawBigRow(c1Y + 170, "LUA ENVIRONMENT","Lua 5.4.6 VM (Lazy Loaded)", COLOR_WHITE);
+
+    // ------------------------------------------------------------------------
+    // CARD 2: Device & Hardware Specifications (Large Text)
+    // ------------------------------------------------------------------------
+    int c2Y = c1Y + c1H + 8;
+    int c2H = 232;
+    display.fillRoundRect(cardX, c2Y, cardW, c2H, 6, COLOR_CARD);
+    display.drawRoundRect(cardX, c2Y, cardW, c2H, 6, COLOR_DIVIDER);
 
     display.setTextDatum(TL_DATUM);
-    display.setTextColor(COLOR_WHITE, COLOR_CARD);
-    display.drawString("Release: " CYDOS_VERSION_TAG " | Powered by Android", cardX + 8, y1 + 24);
+    display.setTextFont(2);
     display.setTextColor(COLOR_CYAN, COLOR_CARD);
-    display.drawString("Author: " CYDOS_AUTHOR " | Lua 5.4.6 VM", cardX + 8, y1 + 38);
-    display.setTextColor(COLOR_MUTED, COLOR_CARD);
-    display.drawString("Repo: " CYDOS_GITHUB_REPO, cardX + 8, y1 + 51);
+    display.drawString("Device Specifications", cardX + 10, c2Y + 6);
+    display.drawFastHLine(cardX + 8, c2Y + 24, cardW - 16, COLOR_DIVIDER);
 
-    // 2. Hardware Specifications Card (Y = bodyY + 74, H = 66)
-    int y2 = bodyY + 74;
-    display.fillRoundRect(cardX, y2, cardW, 66, 6, COLOR_CARD);
-    display.drawRoundRect(cardX, y2, cardW, 66, 6, COLOR_DIVIDER);
+    drawBigRow(c2Y + 30,  "DEVICE MODEL",     "ESP32-2432S028", COLOR_WHITE);
+    drawBigRow(c2Y + 62,  "HARDWARE VARIANT", "CYD 2-USB (Dual Type-C)", COLOR_WHITE);
+    drawBigRow(c2Y + 94,  "MAIN PROCESSOR",   "Xtensa Dual-Core LX6", COLOR_WHITE);
+    drawBigRow(c2Y + 126, "CPU FREQUENCY",    "240 MHz (Max Performance)", COLOR_GREEN);
+    drawBigRow(c2Y + 158, "DISPLAY PANEL",    "2.8\" ST7789 TFT 240x320", COLOR_WHITE);
+    drawBigRow(c2Y + 190, "DIGITIZER & AUDIO","XPT2046 SPI Touch | PWM Piezo", COLOR_WHITE);
+
+    // ------------------------------------------------------------------------
+    // CARD 3: Storage, Partition & System Status (Large Text)
+    // ------------------------------------------------------------------------
+    int c3Y = c2Y + c2H + 8;
+    int c3H = 200;
+    display.fillRoundRect(cardX, c3Y, cardW, c3H, 6, COLOR_CARD);
+    display.drawRoundRect(cardX, c3Y, cardW, c3H, 6, COLOR_DIVIDER);
+
+    display.setTextDatum(TL_DATUM);
+    display.setTextFont(2);
     display.setTextColor(COLOR_CYAN, COLOR_CARD);
-    display.drawString("HARDWARE SPECIFICATIONS", cardX + 8, y2 + 5);
-
-    display.setTextColor(COLOR_WHITE, COLOR_CARD);
-    display.drawString("Board: ESP32-2432S028 (CYD 2-USB)", cardX + 8, y2 + 19);
-
-    char cpuLine[40];
-    snprintf(cpuLine, sizeof(cpuLine), "SoC: Xtensa Dual-Core LX6 @ %luMHz",
-             (unsigned long)ESP.getCpuFreqMHz());
-    display.drawString(cpuLine, cardX + 8, y2 + 31);
-
-    display.setTextColor(COLOR_MUTED, COLOR_CARD);
-    display.drawString("LCD: 2.8\" TFT 240x320 | Touch: XPT2046", cardX + 8, y2 + 43);
-    display.drawString("Flash: 4MB DIO | Audio: PWM Piezo", cardX + 8, y2 + 54);
-
-    // 3. System, OTA Partition & Live Telemetry Card (Y = bodyY + 144, H = 66)
-    int y3 = bodyY + 144;
-    display.fillRoundRect(cardX, y3, cardW, 66, 6, COLOR_CARD);
-    display.drawRoundRect(cardX, y3, cardW, 66, 6, COLOR_DIVIDER);
-    display.setTextColor(COLOR_CYAN, COLOR_CARD);
-    display.drawString("SYSTEM & PARTITION TELEMETRY", cardX + 8, y3 + 5);
+    display.drawString("System & Memory Status", cardX + 10, c3Y + 6);
+    display.drawFastHLine(cardX + 8, c3Y + 24, cardW - 16, COLOR_DIVIDER);
 
     const esp_partition_t* running = esp_ota_get_running_partition();
-    char partLine[40];
+    char partStr[36];
     if (running) {
-        snprintf(partLine, sizeof(partLine), "OTA Slot: %.6s (0x%lX) | Auto-Upd",
-                 running->label, (unsigned long)running->address);
+        snprintf(partStr, sizeof(partStr), "Slot: %s (0x%lX)", running->label, (unsigned long)running->address);
     } else {
-        strncpy(partLine, "OTA Slot: app0 (0x10000) | Auto-Upd", sizeof(partLine) - 1);
-        partLine[sizeof(partLine) - 1] = '\0';
+        strcpy(partStr, "Slot: app0 (0x10000)");
     }
-    display.setTextColor(COLOR_WHITE, COLOR_CARD);
-    display.drawString(partLine, cardX + 8, y3 + 19);
+    drawBigRow(c3Y + 30, "ACTIVE OTA PARTITION", partStr, COLOR_GREEN);
 
-    char memLine[40];
-    snprintf(memLine, sizeof(memLine), "RAM: %luKB Free | FS: %lu/%luKB",
-             (unsigned long)m_cachedRamKb,
-             (unsigned long)m_cachedFlashUsedKb,
-             (unsigned long)m_cachedFlashTotalKb);
-    display.drawString(memLine, cardX + 8, y3 + 31);
+    char ramStr[36];
+    snprintf(ramStr, sizeof(ramStr), "%lu KB Free (Max: %lu KB)",
+             (unsigned long)m_cachedRamKb, (unsigned long)m_cachedMaxBlockKb);
+    drawBigRow(c3Y + 62, "SYSTEM SRAM MEMORY", ramStr, COLOR_WHITE);
 
-    uint32_t upSec = millis() / 1000UL;
-    uint32_t upHr  = upSec / 3600UL;
-    uint32_t upMin = (upSec % 3600UL) / 60UL;
-    uint32_t upRem = upSec % 60UL;
-    char netLine[40];
+    char flashStr[36];
+    snprintf(flashStr, sizeof(flashStr), "%lu KB Used / %lu KB Total",
+             (unsigned long)m_cachedFlashUsedKb, (unsigned long)m_cachedFlashTotalKb);
+    drawBigRow(c3Y + 94, "INTERNAL FLASH (LITTLEFS)", flashStr, COLOR_WHITE);
+
+    drawBigRow(c3Y + 126, "MICROSD STORAGE", StorageHAL::isSDMounted() ? "Mounted (/sd)" : "Not Inserted",
+               StorageHAL::isSDMounted() ? COLOR_GREEN : COLOR_MUTED);
+
+    char netStr[36];
     if (m_cachedWifiConn) {
-        snprintf(netLine, sizeof(netLine), "Up: %luh %02lum %02lus | IP: %.15s",
-                 (unsigned long)upHr, (unsigned long)upMin, (unsigned long)upRem,
-                 WiFi.localIP().toString().c_str());
+        snprintf(netStr, sizeof(netStr), "Connected: %.16s", WiFi.localIP().toString().c_str());
     } else {
-        snprintf(netLine, sizeof(netLine), "Up: %luh %02lum %02lus | Wi-Fi: Offline",
-                 (unsigned long)upHr, (unsigned long)upMin, (unsigned long)upRem);
+        strcpy(netStr, "Wi-Fi Disconnected");
     }
+    drawBigRow(c3Y + 158, "NETWORK IP ADDRESS", netStr, m_cachedWifiConn ? COLOR_GREEN : COLOR_AMBER);
+
+    // ------------------------------------------------------------------------
+    // CARD 4: System Updates Action Button
+    // ------------------------------------------------------------------------
+    int c4Y = c3Y + c3H + 8;
+    int c4H = 70;
+    display.fillRoundRect(cardX, c4Y, cardW, c4H, 6, COLOR_CARD);
+    display.drawRoundRect(cardX, c4Y, cardW, c4H, 6, COLOR_DIVIDER);
+
+    display.setTextDatum(TL_DATUM);
+    display.setTextFont(1);
     display.setTextColor(COLOR_MUTED, COLOR_CARD);
-    display.drawString(netLine, cardX + 8, y3 + 43);
+    display.drawString("Check for new cydOS updates on GitHub:", cardX + 10, c4Y + 8);
 
-    char sdkLine[40];
-    snprintf(sdkLine, sizeof(sdkLine), "ESP-IDF: %.14s | SD: %s",
-             ESP.getSdkVersion(), StorageHAL::isSDMounted() ? "Mounted" : "None");
-    display.setTextColor(COLOR_ANDR_GRN, COLOR_CARD);
-    display.drawString(sdkLine, cardX + 8, y3 + 54);
-
-    // 4. Check For Updates Action Button (Y = bodyY + 214, H = 28)
-    int y4 = bodyY + 214;
-    display.fillRoundRect(cardX, y4, cardW, 28, 5, 0x0352);
-    display.drawRoundRect(cardX, y4, cardW, 28, 5, COLOR_ANDR_GRN);
+    display.fillRoundRect(cardX + 8, c4Y + 24, cardW - 16, 36, 6, 0x0352);
+    display.drawRoundRect(cardX + 8, c4Y + 24, cardW - 16, 36, 6, COLOR_ANDR_GRN);
     display.setTextDatum(MC_DATUM);
+    display.setTextFont(2);
     display.setTextColor(COLOR_WHITE, 0x0352);
-    display.drawString("CHECK FOR UPDATES NOW", cardX + cardW / 2, y4 + 14);
+    display.drawString("CHECK FOR UPDATES NOW", cardX + cardW / 2, c4Y + 42);
+
+    display.resetViewport();
+
+    // Scrollbar Indicator on Right Edge
+    if (maxScroll > 0) {
+        int sbH = (bodyH * bodyH) / ABOUT_CONTENT_H;
+        if (sbH < 20) sbH = 20;
+        int sbY = bodyY + (m_aboutScrollY * (bodyH - sbH)) / maxScroll;
+        display.fillRoundRect(vx + vw - 4, sbY, 3, sbH, 1, COLOR_ANDR_GRN);
+    }
     display.setTextDatum(TL_DATUM);
 }
 
@@ -1296,7 +1342,7 @@ void SettingsApp::handleRegionTimeTap(uint16_t x, uint16_t y) {
 void SettingsApp::handleSystemLogsTap(uint16_t x, uint16_t y) {
     int relY = (int)y - HEADER_H;
 
-    // 1. Verbose Diagnostics toggle (relY = 76..120)
+    // 1. Diagnostics Mode toggle (relY = 76..120)
     if (relY >= 76 && relY <= 120) {
         m_devModeEnabled = !m_devModeEnabled;
         Config::getInstance().setDevModeEnabled(m_devModeEnabled, true);
@@ -1366,28 +1412,18 @@ void SettingsApp::handleUpdateResetTap(uint16_t x, uint16_t y) {
 }
 
 void SettingsApp::handleAboutTap(uint16_t x, uint16_t y) {
-    (void)x;
-    int relY = (int)y - HEADER_H;
+    int vY = (int)y - HEADER_H;
+    int contentY = vY + m_aboutScrollY;
 
-    // Check For Updates Now button (relY = 212..246)
-    if (relY >= 212 && relY <= 246) {
+    // Card 4 Update Button is located at content Y = 672..708
+    if (contentY >= 672 && contentY <= 708 && x >= 14 && x <= 226) {
         hal::beep(35);
         if (WiFi.status() != WL_CONNECTED) {
             ui::UIManager::showToast("Connect Wi-Fi first to check updates!", 1600);
             return;
         }
 
-        // Immediate button feedback while querying GitHub over TLS
-        TFT_eSPI& d = hal::getDisplay();
-        int btnY = 20 + HEADER_H + 214;
-        d.fillRoundRect(6, btnY, 228, 28, 5, 0x2166);
-        d.drawRoundRect(6, btnY, 228, 28, 5, COLOR_CYAN);
-        d.setTextFont(1);
-        d.setTextDatum(MC_DATUM);
-        d.setTextColor(COLOR_CYAN, 0x2166);
-        d.drawString("CHECKING GITHUB RELEASES...", 120, btnY + 14);
-        d.setTextDatum(TL_DATUM);
-
+        ui::UIManager::showToast("Checking GitHub Releases...", 1500);
         char newTag[24] = {0};
         if (core::OtaRecovery::checkForUpdate(newTag, sizeof(newTag))) {
             m_needsFullRedraw = true;
@@ -1422,11 +1458,42 @@ void SettingsApp::handleTapAt(uint16_t x, uint16_t y) {
 }
 
 void SettingsApp::onTouch(uint16_t x, uint16_t y, bool pressed) {
+    int16_t ry = (int16_t)y;
+
     if (pressed) {
         m_lastTouchX = x;
         m_lastTouchY = y;
 
-        // Live drag support on Brightness slider in DISPLAY_SOUND page
+        // 1. Touch Drag Scrolling on ABOUT page
+        if (m_currentPage == SettingsPage::ABOUT) {
+            int bodyH = 274 - HEADER_H;
+            int maxScroll = ABOUT_CONTENT_H - bodyH;
+            if (maxScroll < 0) maxScroll = 0;
+
+            if (!m_wasPressed) {
+                m_wasPressed = true;
+                m_isDraggingScroll = false;
+                m_touchStartY = ry;
+                m_scrollStartY = m_aboutScrollY;
+            } else {
+                int16_t dy = ry - m_touchStartY;
+                if (!m_isDraggingScroll && ry > HEADER_H && abs(dy) > 6) {
+                    m_isDraggingScroll = true;
+                }
+                if (m_isDraggingScroll) {
+                    int16_t newScroll = m_scrollStartY - dy;
+                    if (newScroll < 0) newScroll = 0;
+                    if (newScroll > maxScroll) newScroll = maxScroll;
+                    if (abs(newScroll - m_aboutScrollY) >= 2) {
+                        m_aboutScrollY = newScroll;
+                        m_needsFullRedraw = true;
+                    }
+                }
+            }
+            return;
+        }
+
+        // 2. Brightness Slider drag on DISPLAY_SOUND page
         if (m_currentPage == SettingsPage::DISPLAY_SOUND) {
             int relY = (int)y - HEADER_H;
             if (relY >= 20 && relY <= 58 && x >= 50 && x <= 190) {
@@ -1447,6 +1514,10 @@ void SettingsApp::onTouch(uint16_t x, uint16_t y, bool pressed) {
         if (m_isDraggingSlider) {
             m_isDraggingSlider = false;
             Config::getInstance().setBrightness(m_brightness, true);
+            return;
+        }
+        if (m_isDraggingScroll) {
+            m_isDraggingScroll = false;
             return;
         }
         handleTapAt(m_lastTouchX, m_lastTouchY);
