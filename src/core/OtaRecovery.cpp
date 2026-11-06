@@ -90,6 +90,7 @@ void OtaRecovery::triggerRebootToOtaRecovery() {
 void OtaRecovery::checkAndRunOnBoot() {
     Preferences prefs;
     bool pending = false;
+    bool hwButtonTriggered = false;
     if (prefs.begin(OTA_NVS_NS, false)) {
         pending = prefs.getBool(OTA_NVS_KEY, false);
         if (pending) {
@@ -99,8 +100,52 @@ void OtaRecovery::checkAndRunOnBoot() {
         prefs.end();
     }
 
+    // Hardware Recovery Trigger: check physical BOOT button (GPIO 0, active-LOW) during early startup
     if (!pending) {
-        return;
+        pinMode(0, INPUT_PULLUP);
+        TFT_eSPI &tft = hal::getDisplay();
+        tft.setTextFont(1);
+        tft.setTextDatum(MC_DATUM);
+        tft.setTextColor(0x52AA, TFT_BLACK);
+        tft.drawString("Hold [BOOT] button for OTA Recovery", 120, 306);
+
+        uint32_t windowStart = millis();
+        while (millis() - windowStart < 1300) {
+            if (digitalRead(0) == LOW) {
+                hal::initBoard();
+                hal::beep(45);
+                tft.fillRoundRect(16, 268, 208, 44, 6, 0x10A2);
+                tft.drawRoundRect(16, 268, 208, 44, 6, 0xFFE0);
+                tft.setTextColor(0xFFE0, 0x10A2);
+                tft.drawString("KEEP HOLDING [BOOT] FOR RECOVERY", 120, 280);
+                tft.drawRect(28, 292, 184, 10, TFT_WHITE);
+
+                uint32_t holdStart = millis();
+                bool heldFull = true;
+                while (millis() - holdStart < 1000) {
+                    if (digitalRead(0) != LOW) {
+                        heldFull = false;
+                        break;
+                    }
+                    int w = (int)(((millis() - holdStart) * 180) / 1000);
+                    if (w > 180) w = 180;
+                    tft.fillRect(30, 294, w, 6, 0x07E0);
+                    delay(20);
+                }
+                if (heldFull) {
+                    pending = true;
+                    hwButtonTriggered = true;
+                    hal::beep(90);
+                }
+                break;
+            }
+            delay(20);
+        }
+        tft.setTextDatum(TL_DATUM);
+        if (!pending) {
+            tft.fillRect(0, 264, 240, 56, TFT_BLACK);
+            return;
+        }
     }
 
     hal::initBoard();
@@ -115,7 +160,7 @@ void OtaRecovery::checkAndRunOnBoot() {
     tft.setTextFont(2);
     tft.setTextDatum(MC_DATUM);
     tft.setTextColor(TFT_WHITE, 0x0352);
-    tft.drawString("CYD OTA RECOVERY", 120, 18);
+    tft.drawString(hwButtonTriggered ? "HW BUTTON RECOVERY" : "CYD OTA RECOVERY", 120, 18);
 
     // Partition Info Pill
     const esp_partition_t* running = esp_ota_get_running_partition();
