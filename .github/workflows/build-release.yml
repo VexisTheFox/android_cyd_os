@@ -1,0 +1,153 @@
+name: Build & Release CYD OS Firmware
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Optional release tag (e.g. v2.0.1). Leave empty to auto-generate on main.'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Cache PlatformIO
+        uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: ${{ runner.os }}-pio-${{ hashFiles('platformio.ini') }}
+          restore-keys: |
+            ${{ runner.os }}-pio-
+
+      - name: Install PlatformIO & esptool
+        run: |
+          python -m pip install --upgrade pip
+          pip install --upgrade platformio esptool
+
+      - name: Build Firmware & LittleFS (cyd2usb - ST7789)
+        run: |
+          pio run -e cyd2usb
+          pio run -e cyd2usb -t buildfs
+
+      - name: Build Firmware (cyd2usb_ili9341 & cyd - ILI9341)
+        run: |
+          pio run -e cyd2usb_ili9341
+          pio run -e cyd
+
+      - name: Package Release Artifacts
+        run: |
+          mkdir -p release_assets
+
+          # Copy individual cyd2usb (ST7789 2-USB) binaries
+          cp .pio/build/cyd2usb/bootloader.bin release_assets/cyd2usb-bootloader-0x1000.bin
+          cp .pio/build/cyd2usb/partitions.bin release_assets/cyd2usb-partitions-0x8000.bin
+          cp .pio/build/cyd2usb/firmware.bin   release_assets/cyd2usb-firmware-0x10000.bin
+          if [ -f .pio/build/cyd2usb/littlefs.bin ]; then
+            cp .pio/build/cyd2usb/littlefs.bin release_assets/cyd2usb-littlefs.bin
+          fi
+
+          # Copy alternative board variant firmware binaries
+          cp .pio/build/cyd2usb_ili9341/firmware.bin release_assets/cyd2usb_ili9341-firmware-0x10000.bin
+          cp .pio/build/cyd/firmware.bin             release_assets/cyd-microusb-firmware-0x10000.bin
+
+          # Locate boot_app0.bin from PlatformIO's Arduino ESP32 package
+          BOOT_APP0=$(find ~/.platformio/packages/framework-arduinoespressif32 -name "boot_app0.bin" | head -n 1)
+
+          # Create single merged factory images (flashable at 0x00000 via Web Flasher / esptool)
+          if [ -n "$BOOT_APP0" ]; then
+            esptool.py --chip esp32 merge_bin \
+              -o release_assets/CYD-OS-cyd2usb-MERGED-0x0.bin \
+              --flash_mode dio --flash_freq 40m --flash_size 4MB \
+              0x1000  .pio/build/cyd2usb/bootloader.bin \
+              0x8000  .pio/build/cyd2usb/partitions.bin \
+              0xe000  "$BOOT_APP0" \
+              0x10000 .pio/build/cyd2usb/firmware.bin
+
+            esptool.py --chip esp32 merge_bin \
+              -o release_assets/CYD-OS-cyd2usb_ili9341-MERGED-0x0.bin \
+              --flash_mode dio --flash_freq 40m --flash_size 4MB \
+              0x1000  .pio/build/cyd2usb_ili9341/bootloader.bin \
+              0x8000  .pio/build/cyd2usb_ili9341/partitions.bin \
+              0xe000  "$BOOT_APP0" \
+              0x10000 .pio/build/cyd2usb_ili9341/firmware.bin
+
+            esptool.py --chip esp32 merge_bin \
+              -o release_assets/CYD-OS-cyd-microusb-MERGED-0x0.bin \
+              --flash_mode dio --flash_freq 40m --flash_size 4MB \
+              0x1000  .pio/build/cyd/bootloader.bin \
+              0x8000  .pio/build/cyd/partitions.bin \
+              0xe000  "$BOOT_APP0" \
+              0x10000 .pio/build/cyd/firmware.bin
+          fi
+
+          # Also include the Lua Toolkit JSON for app developers
+          if [ -f lua_toolkit.json ]; then
+            cp lua_toolkit.json release_assets/lua_toolkit.json
+          fi
+
+          ls -lh release_assets/
+
+      - name: Upload Build Artifacts to Workflow Run
+        uses: actions/upload-artifact@v4
+        with:
+          name: cyd-os-firmware-${{ github.sha }}
+          path: release_assets/*
+
+      - name: Determine Release Tag & Name
+        if: github.event_name != 'pull_request'
+        id: meta
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+          elif [[ -n "${{ github.event.inputs.release_tag }}" ]]; then
+            TAG="${{ github.event.inputs.release_tag }}"
+          else
+            SHORT_SHA=$(git rev-parse --short HEAD)
+            TAG="v2.0.${{ github.run_number }}-${SHORT_SHA}"
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "title=CYD Android OS ${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish GitHub Release
+        if: github.event_name != 'pull_request'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: ${{ steps.meta.outputs.title }}
+          generate_release_notes: true
+          body: |
+            ## CYD Android OS Automated Firmware Build (`${{ steps.meta.outputs.tag }}`)
+
+            ### Quick Flash Instructions (Merged Single Binary at `0x0`)
+            Use **ESP Web Flasher** or `esptool.py` to flash the single merged binary for your board at offset `0x0`:
+            - **2-USB CYD (ST7789 - Default)**: `CYD-OS-cyd2usb-MERGED-0x0.bin`
+            - **2-USB CYD (ILI9341 Inverted)**: `CYD-OS-cyd2usb_ili9341-MERGED-0x0.bin`
+            - **1-USB CYD (Micro-USB ILI9341)**: `CYD-OS-cyd-microusb-MERGED-0x0.bin`
+
+            ```bash
+            esptool.py --chip esp32 --port COM4 write_flash 0x0 CYD-OS-cyd2usb-MERGED-0x0.bin
+            ```
+          files: |
+            release_assets/*
