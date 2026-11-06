@@ -25,6 +25,7 @@
 #include "core/MemoryGuard.h"
 #include "core/TimeService.h"
 #include "core/AppRegistry.h"
+#include "core/OtaRecovery.h"
 #include <WiFi.h>
 
 // ============================================================================
@@ -75,6 +76,9 @@ void setup() {
     // and configures hardware LEDC PWM backlight timer on GPIO 21 at 80% duty.
     Serial.println(F("[BOOT] Initializing Display HAL (ST7789 @ 55 MHz)..."));
     hal::initDisplay();
+
+    // Check if rebooted into Minimal-RAM OTA Firmware Recovery Mode
+    core::OtaRecovery::checkAndRunOnBoot();
 
     // 3. Initialize UI Shell Manager in BOOT_SPLASH State
     // Shows the Android Bugdroid vector logo immediately so user sees instant boot response.

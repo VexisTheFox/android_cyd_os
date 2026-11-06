@@ -12,6 +12,7 @@
 #include "core/AppRegistry.h"
 #include "core/Logger.h"
 #include "core/TimeService.h"
+#include "core/OtaRecovery.h"
 #include "hal/StorageHAL.h"
 #include "ui/UIManager.h"
 #include "ui/KeyboardView.h"
@@ -522,16 +523,16 @@ void SettingsApp::renderCardsToCanvas(TFT_eSPI &canvas, int cardX, int baseY, in
     }
 
     // =========================================================================
-    // CARD 7: ABOUT & FACTORY RESET ALL (y: 452..546, h: 94)
+    // CARD 7: ABOUT, OTA UPDATE & FACTORY RESET (y: 452..578, h: 126)
     // =========================================================================
     int c7Y = baseY + 452;
-    if (c7Y + 94 >= 0 && c7Y < bandH) {
-        canvas.fillRoundRect(cardX, c7Y, cardW, 94, 5, COLOR_CARD);
-        canvas.drawRoundRect(cardX, c7Y, cardW, 94, 5, COLOR_CYAN);
+    if (c7Y + 126 >= 0 && c7Y < bandH) {
+        canvas.fillRoundRect(cardX, c7Y, cardW, 126, 5, COLOR_CARD);
+        canvas.drawRoundRect(cardX, c7Y, cardW, 126, 5, COLOR_CYAN);
 
         canvas.setTextDatum(TL_DATUM);
         canvas.setTextColor(COLOR_CYAN, COLOR_CARD);
-        canvas.drawString("About CYD OS [DEV BUILD]", cardX + 8, c7Y + 6);
+        canvas.drawString("About CYD OS & OTA Recovery", cardX + 8, c7Y + 6);
 
         snprintf(buf, sizeof(buf), "ESP32 240MHz | RAM:%luK | FLS:%luK",
                  (unsigned long)m_cachedRamKb, (unsigned long)m_cachedFlashKb);
@@ -553,12 +554,18 @@ void SettingsApp::renderCardsToCanvas(TFT_eSPI &canvas, int cardX, int baseY, in
             canvas.drawString(buf, cardX + 113, c7Y + 44);
         }
 
-        // Factory Reset All Button (c7Y + 62, h = 26)
+        // OTA Firmware Update Button (c7Y + 62, h = 26)
+        canvas.fillRoundRect(cardX + 8, c7Y + 62, 210, 26, 4, 0x04D3);
+        canvas.drawRoundRect(cardX + 8, c7Y + 62, 210, 26, 4, COLOR_ACCENT);
+        canvas.setTextColor(COLOR_WHITE, 0x04D3);
+        canvas.drawString("OTA FIRMWARE UPDATE (GITHUB)", cardX + 113, c7Y + 75);
+
+        // Factory Reset All Button (c7Y + 94, h = 26)
         uint16_t rstBg = m_confirmReset ? COLOR_WARNING : COLOR_DANGER;
-        canvas.fillRoundRect(cardX + 8, c7Y + 62, 210, 26, 4, rstBg);
-        canvas.drawRoundRect(cardX + 8, c7Y + 62, 210, 26, 4, COLOR_WHITE);
+        canvas.fillRoundRect(cardX + 8, c7Y + 94, 210, 26, 4, rstBg);
+        canvas.drawRoundRect(cardX + 8, c7Y + 94, 210, 26, 4, COLOR_WHITE);
         canvas.setTextColor(m_confirmReset ? TFT_BLACK : COLOR_WHITE, rstBg);
-        canvas.drawString(m_confirmReset ? "TAP AGAIN: WIPE & REBOOT" : "FACTORY RESET ALL", cardX + 113, c7Y + 75);
+        canvas.drawString(m_confirmReset ? "TAP AGAIN: WIPE & REBOOT" : "FACTORY RESET ALL", cardX + 113, c7Y + 107);
     }
 }
 
@@ -864,8 +871,8 @@ void SettingsApp::handleTapAt(uint16_t x, uint16_t y) {
         return;
     }
 
-    // CARD 7: ABOUT & FACTORY RESET ALL (452..546)
-    if (contentY >= 452 && contentY <= 550) {
+    // CARD 7: ABOUT, OTA UPDATE & FACTORY RESET ALL (452..580)
+    if (contentY >= 452 && contentY <= 582) {
         if (contentY < 510) {
             // Build Number Box
             if (m_devModeEnabled) {
@@ -883,8 +890,12 @@ void SettingsApp::handleTapAt(uint16_t x, uint16_t y) {
             }
             m_needsScrollRedraw = true;
             return;
+        } else if (contentY < 542) {
+            // OTA Firmware Update (GitHub Releases Recovery Mode)
+            core::OtaRecovery::triggerRebootToOtaRecovery();
+            return;
         } else {
-            // Factory Reset All Button (contentY >= 510)
+            // Factory Reset All Button (contentY >= 542)
             if (!m_confirmReset) {
                 m_confirmReset = true;
                 hal::beep(35);

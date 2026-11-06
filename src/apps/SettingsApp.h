@@ -34,7 +34,7 @@ public:
 
 private:
     static constexpr int HEADER_H     = 24;
-    static constexpr int CONTENT_H    = 552;
+    static constexpr int CONTENT_H    = 586;
     static constexpr int VISIBLE_H    = 274 - HEADER_H; // 250 px
     static constexpr int MAX_SCROLL_Y = CONTENT_H - VISIBLE_H; // 302 px
 
