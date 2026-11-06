@@ -1,6 +1,9 @@
 /**
  * @file PlayStoreApp.cpp
  * @brief Native Android-Style Play Store & OTA Lua App Downloader for CYD OS
+ *
+ * Connected to official cloud repository:
+ *   https://github.com/VexisTheFox/cydos_appstore
  */
 
 #include "PlayStoreApp.h"
@@ -21,509 +24,81 @@
 namespace apps {
 
 // =============================================================================
-// BUNDLED CLOUD STORE APPS (PROGMEM + GitHub Cloud Sync)
-// Each script includes -- @name, -- @bg, and -- @icon_b64 in its header!
+// OFFICIAL CYD OS APP STORE CATALOG (https://github.com/VexisTheFox/cydos_appstore)
+// Organized by Category: Internet, Games, Media, Utilities
 // =============================================================================
 
-static const char STORE_WEATHER_LUA[] PROGMEM = R"LUA(-- @name: Weather
--- @bg: 0x0276
--- @icon_b64: APDwAAw/wwAD//wAP/9VAAP1VVAPVVVUAVVVVQVVVVUFVVVVAVVVVAAAAAAAoKCgAoKCgAKCgoAAAAAAAAAAAA==
-
-local VP_X, VP_Y, VP_W, VP_H = 0, 20, 240, 274
-local ICON_B64 = "APDwAAw/wwAD//wAP/9VAAP1VVAPVVVUAVVVVQVVVVUFVVVVAVVVVAAAAAAAoKCgAoKCgAKCgoAAAAAAAAAAAA=="
-
-local city = "Prague"
-local lat, lon = "50.08", "14.43"
-local reg = sys.getRegion and sys.getRegion() or "Czechia"
-if string.find(reg, "USA") then city, lat, lon = "New York", "40.71", "-74.01"
-elseif string.find(reg, "Albania") then city, lat, lon = "Tirana", "41.33", "19.82"
-elseif string.find(reg, "Germany") then city, lat, lon = "Berlin", "52.52", "13.41"
-elseif string.find(reg, "UK") then city, lat, lon = "London", "51.51", "-0.13"
-elseif string.find(reg, "Japan") then city, lat, lon = "Tokyo", "35.68", "139.69"
-end
-
-local temp = "--.- C"
-local wind = "-- km/h"
-local status = "Tap FETCH LIVE to query Open-Meteo"
-
-local function drawUI()
-    gui.fillRect(VP_X, VP_Y, VP_W, VP_H, 0x0821)
-    gui.fillRect(VP_X, VP_Y, VP_W, 24, 0x0276)
-    gui.drawFastHLine(VP_X, VP_Y + 24, VP_W, 0x07FF)
-    gui.drawText(8, VP_Y + 7, "LIVE WEATHER (" .. city .. ")", 0xFFFF, 1)
-
-    gui.fillRect(16, VP_Y + 36, 208, 120, 0x10A2)
-    gui.drawRect(16, VP_Y + 36, 208, 120, 0x07FF)
-    if gui.drawBase64 then
-        gui.drawBase64(54, VP_Y + 84, ICON_B64, 3, 0xFFE0)
-    end
-    gui.drawText(98, VP_Y + 54, "TEMP:", 0x9CD3, 1)
-    gui.drawText(98, VP_Y + 68, temp, 0xFFE0, 2)
-    gui.drawText(98, VP_Y + 98, "WIND:", 0x9CD3, 1)
-    gui.drawText(98, VP_Y + 112, wind, 0x07FF, 2)
-    gui.drawText(26, VP_Y + 140, "Coords: " .. lat .. ", " .. lon, 0x9CD3, 1)
-
-    gui.fillRect(16, VP_Y + 166, 208, 36, 0x10A2)
-    gui.drawRect(16, VP_Y + 166, 208, 36, 0x3186)
-    gui.drawText(24, VP_Y + 174, "Status:", 0x07E0, 1)
-    gui.drawText(24, VP_Y + 188, string.sub(status, 1, 32), 0xFFFF, 1)
-
-    gui.fillRect(24, VP_Y + 216, 192, 42, 0x04D3)
-    gui.drawRect(24, VP_Y + 216, 192, 42, 0x07FF)
-    gui.drawText(66, VP_Y + 230, "FETCH LIVE WEATHER", 0xFFFF, 1)
-end
-
-local function fetchWeather()
-    status = "Querying api.open-meteo.com..."
-    drawUI()
-    local url = "https://api.open-meteo.com/v1/forecast?latitude=" .. lat .. "&longitude=" .. lon .. "&current_weather=true"
-    local body, code, err = http.get(url)
-    if body and code == 200 then
-        local cw = string.match(body, '"current_weather"%s*:%s*(%b{})') or body
-        local t = string.match(cw, '"temperature"%s*:%s*([%-0-9%.]+)')
-        local w = string.match(cw, '"windspeed"%s*:%s*([%-0-9%.]+)')
-        if t then temp = t .. " C" end
-        if w then wind = w .. " km/h" end
-        status = "HTTP 200 OK (Open-Meteo API)"
-    else
-        status = "Err " .. tostring(code) .. ": " .. tostring(err or "No WiFi")
-    end
-    drawUI()
-end
-
-drawUI()
-local wasT = false
-while true do
-    local tx, ty, pressed = input.getTouch()
-    if pressed and not wasT then
-        if ty >= VP_Y + 216 and ty <= VP_Y + 258 and tx >= 24 and tx <= 216 then
-            sys.beep(1200, 25)
-            fetchWeather()
-        end
-    end
-    wasT = pressed
-    sys.delay(25)
-end
-)LUA";
-
-static const char STORE_NETTOOLS_LUA[] PROGMEM = R"LUA(-- @name: NetTools
--- @bg: 0x0352
--- @icon_b64: ACqoAAKBQoAIJBggIIQSCCIQBIiFV9VShB/0EpVf9VaVX/VWhB/0EoVX1VIiEASIIIQSCAgkGCACgUKAACqoAA==
-
-local VP_X, VP_Y, VP_W, VP_H = 0, 20, 240, 274
-local r1, r2, r3 = "Not tested", "Not tested", "Not tested"
-local pubInfo = "Tap HTTP IP TEST"
-
-local function drawUI()
-    gui.fillRect(VP_X, VP_Y, VP_W, VP_H, 0x0821)
-    gui.fillRect(VP_X, VP_Y, VP_W, 22, 0x0352)
-    gui.drawFastHLine(VP_X, VP_Y + 22, VP_W, 0x07FF)
-    gui.drawText(8, VP_Y + 7, "NET PING & HTTP SUITE", 0xFFFF, 1)
-
-    gui.fillRect(10, VP_Y + 30, 220, 44, 0x10A2)
-    gui.drawRect(10, VP_Y + 30, 220, 44, 0x3186)
-    gui.drawText(16, VP_Y + 36, "WiFi: " .. wifi.getStatus() .. " (" .. wifi.getIP() .. ")", 0x07FF, 1)
-    local tStr, synced = sys.getTime()
-    gui.drawText(16, VP_Y + 52, "Time: " .. tStr .. (synced and " [NTP OK]" or " [LOCAL]"), 0xFFE0, 1)
-
-    gui.fillRect(10, VP_Y + 80, 220, 82, 0x10A2)
-    gui.drawRect(10, VP_Y + 80, 220, 82, 0x3186)
-    gui.drawText(16, VP_Y + 86,  "1.1.1.1 (Cloudflare): " .. r1, 0xFFFF, 1)
-    gui.drawText(16, VP_Y + 104, "8.8.8.8 (Google DNS): " .. r2, 0xFFFF, 1)
-    gui.drawText(16, VP_Y + 122, "github.com (TCP 80) : " .. r3, 0xFFFF, 1)
-    gui.drawText(16, VP_Y + 142, "WAN: " .. string.sub(pubInfo, 1, 30), 0x07E0, 1)
-
-    gui.fillRect(10, VP_Y + 172, 106, 40, 0x04D3)
-    gui.drawRect(10, VP_Y + 172, 106, 40, 0x07FF)
-    gui.drawText(26, VP_Y + 188, "RUN PINGS", 0xFFFF, 1)
-
-    gui.fillRect(124, VP_Y + 172, 106, 40, 0x2C9F)
-    gui.drawRect(124, VP_Y + 172, 106, 40, 0x07FF)
-    gui.drawText(142, VP_Y + 188, "HTTP WAN IP", 0xFFFF, 1)
-
-    gui.fillRect(10, VP_Y + 220, 220, 38, 0x18E3)
-    gui.drawRect(10, VP_Y + 220, 220, 38, 0xFFE0)
-    gui.drawText(66, VP_Y + 235, "SYNC NTP CLOCK NOW", 0xFFE0, 1)
-end
-
-drawUI()
-local wasT = false
-while true do
-    local tx, ty, pressed = input.getTouch()
-    if pressed and not wasT then
-        if ty >= VP_Y + 172 and ty <= VP_Y + 212 then
-            sys.beep(1100, 20)
-            if tx < 120 then
-                r1 = "Pinging..."
-                drawUI()
-                local ok1, ms1 = net.ping("1.1.1.1", 53)
-                r1 = ok1 and (ms1 .. " ms") or "FAIL"
-                local ok2, ms2 = net.ping("8.8.8.8", 53)
-                r2 = ok2 and (ms2 .. " ms") or "FAIL"
-                local ok3, ms3 = net.ping("github.com", 80)
-                r3 = ok3 and (ms3 .. " ms") or "FAIL"
-                drawUI()
-            else
-                pubInfo = "Fetching ip-api.com..."
-                drawUI()
-                local b, c = http.get("http://ip-api.com/line/?fields=query,country")
-                if b and c == 200 then
-                    pubInfo = string.gsub(b, "[\r\n]+", " ")
-                else
-                    pubInfo = "HTTP Err " .. tostring(c)
-                end
-                drawUI()
-            end
-        elseif ty >= VP_Y + 220 and ty <= VP_Y + 258 then
-            sys.beep(1300, 25)
-            sys.syncNTP(2500)
-            drawUI()
-        end
-    end
-    wasT = pressed
-    sys.delay(25)
-end
-)LUA";
-
-static const char STORE_CYBERSYNTH_LUA[] PROGMEM = R"LUA(-- @name: CyberSynth
--- @bg: 0x4812
--- @icon_b64: APAPAAMMMMD8A8A/AAAAAKqqqqpUUVFFVFFRRVRRUUVUUVFFVAFQBVUVVFVVFVRVVRVUVVUVVFWqqqqqAAAAAA==
-
-local VP_X, VP_Y, VP_W, VP_H = 0, 20, 240, 274
-local notes = {
-    { name = "C4", freq = 262 }, { name = "D4", freq = 294 },
-    { name = "E4", freq = 330 }, { name = "F4", freq = 349 },
-    { name = "G4", freq = 392 }, { name = "A4", freq = 440 },
-    { name = "B4", freq = 494 }, { name = "C5", freq = 523 }
-}
-local octave = 1
-local activeKey = -1
-
-local function drawHeader(freqText)
-    gui.fillRect(VP_X, VP_Y, VP_W, 48, 0x10A2)
-    gui.drawFastHLine(VP_X, VP_Y + 48, VP_W, 0xF81F)
-    gui.drawText(8, VP_Y + 6, "CYBERSYNTH FM [OCT x" .. octave .. "]", 0x07FF, 1)
-    gui.drawText(8, VP_Y + 24, freqText or "Touch keys below to play", 0xFFE0, 1)
-    gui.fillRect(172, VP_Y + 8, 60, 30, 0x4812)
-    gui.drawRect(172, VP_Y + 8, 60, 30, 0x07FF)
-    gui.drawText(184, VP_Y + 19, "OCTAVE", 0xFFFF, 1)
-end
-
-local function drawKey(idx, pressed)
-    local kw = 30
-    local x = (idx - 1) * kw
-    local y = VP_Y + 54
-    local h = 212
-    local bg = pressed and 0x07FF or ((idx % 2 == 0) and 0x18E3 or 0x2965)
-    local fg = pressed and 0x0000 or 0xFFFF
-    gui.fillRect(x + 1, y, kw - 2, h, bg)
-    gui.drawRect(x + 1, y, kw - 2, h, 0xF81F)
-    gui.drawText(x + 8, y + h - 24, notes[idx].name, fg, 1)
-end
-
-gui.fillRect(VP_X, VP_Y, VP_W, VP_H, 0x0000)
-drawHeader()
-for i = 1, 8 do drawKey(i, false) end
-
-local wasT = false
-while true do
-    local tx, ty, pressed = input.getTouch()
-    if pressed then
-        if not wasT and ty >= VP_Y + 6 and ty <= VP_Y + 42 and tx >= 170 then
-            octave = (octave == 1) and 2 or 1
-            sys.beep(880 * octave, 25)
-            drawHeader("Octave switched")
-        elseif ty >= VP_Y + 54 then
-            local k = math.floor(tx / 30) + 1
-            if k < 1 then k = 1 elseif k > 8 then k = 8 end
-            if k ~= activeKey then
-                if activeKey > 0 then drawKey(activeKey, false) end
-                activeKey = k
-                drawKey(activeKey, true)
-                local f = notes[k].freq * octave
-                drawHeader("Note: " .. notes[k].name .. " (" .. f .. " Hz)")
-                sys.beep(f, 70)
-            end
-        end
-    elseif wasT and activeKey > 0 then
-        drawKey(activeKey, false)
-        activeKey = -1
-    end
-    wasT = pressed
-    sys.delay(18)
-end
-)LUA";
-
-static const char STORE_FLAPPY_LUA[] PROGMEM = R"LUA(-- @name: Flappy CYD
--- @bg: 0x1386
--- @icon_b64: AAAAAAAP/AAA//UAA//WQA9X1kANVfUADVX/qA9X/qoD//+oAP//AAAP8AAAAAAAqqqqqgAAAAAAAAAAAAAAAA==
-
-local VP_X, VP_Y, VP_W, VP_H = 0, 20, 240, 274
-local birdY, birdV = 140, 0
-local pipeX, gapY = 220, 120
-local score, best = 0, 0
-local prevBirdY, prevPipeX = 140, 220
-
-gui.fillRect(VP_X, VP_Y, VP_W, VP_H, 0x0821)
-gui.fillRect(VP_X, VP_Y, VP_W, 20, 0x1386)
-gui.drawText(8, VP_Y + 6, "FLAPPY CYD - TAP TO FLAP", 0xFFE0, 1)
-
-while true do
-    local tx, ty, pressed = input.getTouch()
-    if pressed and birdV > -2 then
-        birdV = -4.5
-        sys.beep(1100, 10)
-    end
-
-    gui.fillRect(36, math.floor(prevBirdY), 14, 12, 0x0821)
-    gui.fillRect(prevPipeX, VP_Y + 22, 22, gapY - (VP_Y + 22), 0x0821)
-    gui.fillRect(prevPipeX, gapY + 64, 22, (VP_Y + VP_H) - (gapY + 64), 0x0821)
-
-    birdV = birdV + 0.45
-    birdY = birdY + birdV
-    pipeX = pipeX - 4
-
-    if pipeX < -22 then
-        pipeX = 236
-        gapY = math.random(VP_Y + 44, VP_Y + 180)
-        score = score + 1
-        if score > best then best = score end
-        gui.fillRect(148, VP_Y + 4, 88, 12, 0x1386)
-        gui.drawText(150, VP_Y + 6, "S:" .. score .. " B:" .. best, 0x07FF, 1)
-    end
-
-    if birdY < VP_Y + 24 or birdY > VP_Y + VP_H - 14 or
-       (pipeX < 50 and pipeX + 22 > 36 and (birdY < gapY or birdY + 12 > gapY + 64)) then
-        sys.beep(260, 80)
-        score = 0
-        birdY, birdV, pipeX = 140, 0, 236
-        gui.fillRect(VP_X, VP_Y + 22, VP_W, VP_H - 22, 0x0821)
-        gui.fillRect(148, VP_Y + 4, 88, 12, 0x1386)
-        gui.drawText(150, VP_Y + 6, "S:0 B:" .. best, 0x07FF, 1)
-    end
-
-    if pipeX >= 0 and pipeX < 238 then
-        gui.fillRect(pipeX, VP_Y + 22, 20, gapY - (VP_Y + 22), 0x07E0)
-        gui.fillRect(pipeX, gapY + 64, 20, (VP_Y + VP_H) - (gapY + 64), 0x07E0)
-    end
-    gui.fillRect(36, math.floor(birdY), 14, 12, 0xFFE0)
-
-    prevBirdY = birdY
-    prevPipeX = pipeX
-    sys.delay(28)
-end
-)LUA";
-
-static const char STORE_2048_LUA[] PROGMEM = R"LUA(-- @name: 2048 Game
--- @bg: 0x5180
--- @icon_b64: P/wqqP//qqr1X6Qa8B+kGvVfpVr0D6Aa9V+gGj/8KqgqqD/8qqr//6Va9V+kCvQfpVr1X6Qa9B+lWvVfKqg//A==
-
-local VP_X, VP_Y, VP_W, VP_H = 0, 20, 240, 274
-local grid = {{0,0,0,0},{0,0,0,0},{0,0,0,0},{0,0,0,0}}
-local score = 0
-
-local function spawn()
-    local empty = {}
-    for r = 1, 4 do
-        for c = 1, 4 do
-            if grid[r][c] == 0 then table.insert(empty, {r, c}) end
-        end
-    end
-    if #empty > 0 then
-        local pick = empty[math.random(1, #empty)]
-        grid[pick[1]][pick[2]] = (math.random(1, 10) == 1) and 4 or 2
-    end
-end
-
-local function drawBoard()
-    gui.fillRect(VP_X, VP_Y, VP_W, 24, 0x5180)
-    gui.drawText(8, VP_Y + 7, "2048 PUZZLE | SCORE: " .. score, 0xFFFF, 1)
-    for r = 1, 4 do
-        for c = 1, 4 do
-            local v = grid[r][c]
-            local x = 12 + (c - 1) * 54
-            local y = VP_Y + 30 + (r - 1) * 48
-            local bg = (v == 0) and 0x18E3 or ((v <= 8) and 0x2C9F or ((v <= 64) and 0x04D3 or 0xFD00))
-            gui.fillRect(x, y, 50, 44, bg)
-            gui.drawRect(x, y, 50, 44, 0x3186)
-            if v > 0 then
-                gui.drawText(x + 12, y + 14, tostring(v), 0xFFFF, 2)
-            end
-        end
-    end
-    local by = VP_Y + 228
-    local labels = {"LEFT", "UP", "DOWN", "RIGHT"}
-    for i = 1, 4 do
-        local bx = 8 + (i - 1) * 57
-        gui.fillRect(bx, by, 53, 38, 0x10A2)
-        gui.drawRect(bx, by, 53, 38, 0x07FF)
-        gui.drawText(bx + 10, by + 15, labels[i], 0xFFE0, 1)
-    end
-end
-
-local function slideLine(line)
-    local out = {}
-    for i = 1, 4 do if line[i] ~= 0 then table.insert(out, line[i]) end end
-    local i = 1
-    local merged = {}
-    while i <= #out do
-        if i < #out and out[i] == out[i+1] then
-            local val = out[i] * 2
-            score = score + val
-            table.insert(merged, val)
-            i = i + 2
-        else
-            table.insert(merged, out[i])
-            i = i + 1
-        end
-    end
-    while #merged < 4 do table.insert(merged, 0) end
-    return merged
-end
-
-local function move(dir)
-    for idx = 1, 4 do
-        local line = {}
-        for k = 1, 4 do
-            if dir == 1 then line[k] = grid[idx][k]
-            elseif dir == 4 then line[k] = grid[idx][5 - k]
-            elseif dir == 2 then line[k] = grid[k][idx]
-            else line[k] = grid[5 - k][idx] end
-        end
-        local res = slideLine(line)
-        for k = 1, 4 do
-            if dir == 1 then grid[idx][k] = res[k]
-            elseif dir == 4 then grid[idx][5 - k] = res[k]
-            elseif dir == 2 then grid[k][idx] = res[k]
-            else grid[5 - k][idx] = res[k] end
-        end
-    end
-    spawn()
-    drawBoard()
-end
-
-gui.fillRect(VP_X, VP_Y, VP_W, VP_H, 0x0821)
-spawn(); spawn(); drawBoard()
-
-local wasT = false
-while true do
-    local tx, ty, pressed = input.getTouch()
-    if pressed and not wasT and ty >= VP_Y + 224 then
-        local btn = math.floor((tx - 8) / 57) + 1
-        if btn >= 1 and btn <= 4 then
-            sys.beep(950, 18)
-            move(btn)
-        end
-    end
-    wasT = pressed
-    sys.delay(25)
-end
-)LUA";
-
-static const char STORE_WORLDCLOCK_LUA[] PROGMEM = R"LUA(-- @name: WorldTime
--- @bg: 0x1928
--- @icon_b64: ACqoAAKVVoAJQUFgJAPAGCQDwBiQA8AGkAPABpUD/xaVA/8WkAAABpAAAAYkAAAYJAFAGAlBQWAClVaAACqoAA==
-
-local VP_X, VP_Y, VP_W, VP_H = 0, 20, 240, 274
-local ICON_B64 = "ACqoAAKVVoAJQUFgJAPAGCQDwBiQA8AGkAPABpUD/xaVA/8WkAAABpAAAAYkAAAYJAFAGAlBQWAClVaAACqoAA=="
-
-local function fmtZone(epoch, offsetHours)
-    local z = epoch + offsetHours * 3600
-    local s = z % 60
-    local m = math.floor(z / 60) % 60
-    local h = math.floor(z / 3600) % 24
-    return string.format("%02d:%02d:%02d", h, m, s)
-end
-
-gui.fillRect(VP_X, VP_Y, VP_W, VP_H, 0x0821)
-gui.fillRect(VP_X, VP_Y, VP_W, 24, 0x1928)
-gui.drawFastHLine(VP_X, VP_Y + 24, VP_W, 0x07FF)
-if gui.drawBase64 then gui.drawBase64(14, VP_Y + 12, ICON_B64, 1, 0xFFE0) end
-gui.drawText(28, VP_Y + 8, "NTP WORLD CLOCK", 0xFFFF, 1)
-
-gui.fillRect(20, VP_Y + 224, 200, 38, 0x04D3)
-gui.drawRect(20, VP_Y + 224, 200, 38, 0x07FF)
-gui.drawText(68, VP_Y + 239, "SYNC NTP NOW", 0xFFFF, 1)
-
-local lastSec = -1
-local wasT = false
-while true do
-    local tx, ty, pressed = input.getTouch()
-    if pressed and not wasT and ty >= VP_Y + 224 then
-        sys.beep(1250, 25)
-        sys.syncNTP(2000)
-        lastSec = -1
-    end
-    wasT = pressed
-
-    local tStr, synced, epoch, h, m, s = sys.getTime()
-    if s ~= lastSec then
-        lastSec = s
-        gui.fillRect(12, VP_Y + 32, 216, 182, 0x10A2)
-        gui.drawRect(12, VP_Y + 32, 216, 182, 0x3186)
-        gui.drawText(20, VP_Y + 40, "Local (" .. sys.getRegion() .. ")", 0x07FF, 1)
-        gui.drawText(20, VP_Y + 54, tStr, 0xFFE0, 4)
-        gui.drawText(152, VP_Y + 62, synced and "[NTP OK]" or "[UPTIME]", 0x07E0, 1)
-
-        gui.drawText(20, VP_Y + 94,  "UTC / GMT      : " .. fmtZone(epoch, 0), 0xFFFF, 1)
-        gui.drawText(20, VP_Y + 114, "Prague (CET)   : " .. fmtZone(epoch, 1), 0xFFFF, 1)
-        gui.drawText(20, VP_Y + 134, "New York (EST) : " .. fmtZone(epoch, -5), 0xFFFF, 1)
-        gui.drawText(20, VP_Y + 154, "Tokyo (JST)    : " .. fmtZone(epoch, 9), 0xFFFF, 1)
-        gui.drawText(20, VP_Y + 174, "Sydney (AEST)  : " .. fmtZone(epoch, 10), 0xFFFF, 1)
-        gui.drawText(20, VP_Y + 194, "Epoch: " .. tostring(epoch), 0x9CD3, 1)
-    end
-    sys.delay(40)
-end
-)LUA";
-
 static const StoreCatalogItem STORE_CATALOG[] = {
+    // --- Category: Internet (apps/internet/) ---
     {
-        "weather", "Weather", "Live HTTP API",
+        "weather", "Weather", "NET", StoreCategory::INTERNET,
         "Open-Meteo live temp & wind",
         "/apps/weather.lua",
-        "https://raw.githubusercontent.com/VexisTheFox/android_cyd_os/main/store/weather.lua",
+        "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/internet/weather.lua",
         "APDwAAw/wwAD//wAP/9VAAP1VVAPVVVUAVVVVQVVVVUFVVVVAVVVVAAAAAAAoKCgAoKCgAKCgoAAAAAAAAAAAA==",
-        0x0276, STORE_WEATHER_LUA
+        0x0276
     },
     {
-        "nettools", "NetTools", "Network & Ping",
+        "nettools", "NetTools", "NET", StoreCategory::INTERNET,
         "TCP Ping, WAN IP & NTP test",
         "/apps/nettools.lua",
-        "https://raw.githubusercontent.com/VexisTheFox/android_cyd_os/main/store/nettools.lua",
+        "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/internet/nettools.lua",
         "ACqoAAKBQoAIJBggIIQSCCIQBIiFV9VShB/0EpVf9VaVX/VWhB/0EoVX1VIiEASIIIQSCAgkGCACgUKAACqoAA==",
-        0x0352, STORE_NETTOOLS_LUA
+        0x0352
     },
+
+    // --- Category: Games (apps/games/) ---
     {
-        "cybersynth", "CyberSynth", "Audio Synth",
-        "8-key FM synthesizer & octaves",
-        "/apps/cybersynth.lua",
-        "https://raw.githubusercontent.com/VexisTheFox/android_cyd_os/main/store/cybersynth.lua",
-        "APAPAAMMMMD8A8A/AAAAAKqqqqpUUVFFVFFRRVRRUUVUUVFFVAFQBVUVVFVVFVRVVRVUVVUVVFWqqqqqAAAAAA==",
-        0x4812, STORE_CYBERSYNTH_LUA
-    },
-    {
-        "flappy", "Flappy CYD", "Arcade Game",
+        "flappy", "Flappy CYD", "GAMES", StoreCategory::GAMES,
         "Smooth 35 FPS arcade game",
         "/apps/flappy.lua",
-        "https://raw.githubusercontent.com/VexisTheFox/android_cyd_os/main/store/flappy.lua",
+        "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/games/flappy.lua",
         "AAAAAAAP/AAA//UAA//WQA9X1kANVfUADVX/qA9X/qoD//+oAP//AAAP8AAAAAAAqqqqqgAAAAAAAAAAAAAAAA==",
-        0x1386, STORE_FLAPPY_LUA
+        0x1386
     },
     {
-        "game2048", "2048 Game", "Puzzle Game",
+        "game2048", "2048 Game", "GAMES", StoreCategory::GAMES,
         "Classic 4x4 2048 tile puzzle",
         "/apps/game2048.lua",
-        "https://raw.githubusercontent.com/VexisTheFox/android_cyd_os/main/store/game2048.lua",
+        "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/games/game2048.lua",
         "P/wqqP//qqr1X6Qa8B+kGvVfpVr0D6Aa9V+gGj/8KqgqqD/8qqr//6Va9V+kCvQfpVr1X6Qa9B+lWvVfKqg//A==",
-        0x5180, STORE_2048_LUA
+        0x5180
     },
     {
-        "worldclock", "WorldTime", "NTP Clock",
+        "snake", "CyberSnake", "GAMES", StoreCategory::GAMES,
+        "Classic grid arcade snake",
+        "/apps/snake.lua",
+        "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/games/snake.lua",
+        "AAAAAAAA//wAAP/+AAD/AAAA/wAAAP/8AAD//wAAAA/wAAAP8AAAD/AA//8AAP/+AAAAAAAAAAAAAAAAAAAAAA==",
+        0x03E0
+    },
+
+    // --- Category: Media (apps/media/) ---
+    {
+        "cybersynth", "CyberSynth", "MEDIA", StoreCategory::MEDIA,
+        "8-key FM synthesizer & octaves",
+        "/apps/cybersynth.lua",
+        "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/media/cybersynth.lua",
+        "APAPAAMMMMD8A8A/AAAAAKqqqqpUUVFFVFFRRVRRUUVUUVFFVAFQBVUVVFVVFVRVVRVUVVUVVFWqqqqqAAAAAA==",
+        0x4812
+    },
+
+    // --- Category: Utilities (apps/utilities/) ---
+    {
+        "worldclock", "WorldTime", "TOOLS", StoreCategory::UTILITIES,
         "Multi-timezone live NTP clock",
         "/apps/worldclock.lua",
-        "https://raw.githubusercontent.com/VexisTheFox/android_cyd_os/main/store/worldclock.lua",
+        "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/utilities/worldclock.lua",
         "ACqoAAKVVoAJQUFgJAPAGCQDwBiQA8AGkAPABpUD/xaVA/8WkAAABpAAAAYkAAAYJAFAGAlBQWAClVaAACqoAA==",
-        0x1928, STORE_WORLDCLOCK_LUA
+        0x1928
+    },
+    {
+        "stopwatch", "Stopwatch", "TOOLS", StoreCategory::UTILITIES,
+        "Precision stopwatch & lap timer",
+        "/apps/stopwatch.lua",
+        "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/utilities/stopwatch.lua",
+        "AA/wAAAP8AAA//8AAB8fAAA4BwAAcAcAAOAHAADgRwAA4EcAAOBPAADgHwAAcAcAAHAHAAD//wAAf/4AAA/wAA==",
+        0x6010
     }
 };
 
@@ -531,6 +106,7 @@ static constexpr int CATALOG_COUNT = sizeof(STORE_CATALOG) / sizeof(STORE_CATALO
 
 PlayStoreApp::PlayStoreApp()
     : m_activeTab(0),
+      m_activeCategory(0),
       m_scrollY(0),
       m_selectedIndex(0),
       m_wasPressed(false),
@@ -542,11 +118,11 @@ PlayStoreApp::PlayStoreApp()
       m_needsFullRedraw(true),
       m_needsListRedraw(true),
       m_needsFooterRedraw(true) {
-    strncpy(m_customUrl, "https://raw.githubusercontent.com/VexisTheFox/android_cyd_os/main/store/weather.lua", sizeof(m_customUrl) - 1);
+    strncpy(m_customUrl, "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/internet/weather.lua", sizeof(m_customUrl) - 1);
     m_customUrl[sizeof(m_customUrl) - 1] = '\0';
-    strncpy(m_customFile, "custom_app.lua", sizeof(m_customFile) - 1);
+    strncpy(m_customFile, "weather.lua", sizeof(m_customFile) - 1);
     m_customFile[sizeof(m_customFile) - 1] = '\0';
-    strncpy(m_statusLine, "Ready to download via Wi-Fi / Cloud", sizeof(m_statusLine) - 1);
+    strncpy(m_statusLine, "Repo: VexisTheFox/cydos_appstore", sizeof(m_statusLine) - 1);
     m_statusLine[sizeof(m_statusLine) - 1] = '\0';
 }
 
@@ -569,13 +145,39 @@ void PlayStoreApp::onPause() {
 
 void PlayStoreApp::onDestroy() {}
 
-bool PlayStoreApp::isInstalled(int idx) const {
-    if (idx < 0 || idx >= CATALOG_COUNT) return false;
-    return StorageHAL::fileExists(STORE_CATALOG[idx].localPath);
+int PlayStoreApp::getFilteredCount() const {
+    if (m_activeCategory == 0) return CATALOG_COUNT;
+    int count = 0;
+    for (int i = 0; i < CATALOG_COUNT; i++) {
+        if ((uint8_t)STORE_CATALOG[i].category == m_activeCategory) {
+            count++;
+        }
+    }
+    return count;
+}
+
+int PlayStoreApp::getCatalogIndexFromFiltered(int filteredIdx) const {
+    if (filteredIdx < 0) return -1;
+    if (m_activeCategory == 0) {
+        return (filteredIdx < CATALOG_COUNT) ? filteredIdx : -1;
+    }
+    int cur = 0;
+    for (int i = 0; i < CATALOG_COUNT; i++) {
+        if ((uint8_t)STORE_CATALOG[i].category == m_activeCategory) {
+            if (cur == filteredIdx) return i;
+            cur++;
+        }
+    }
+    return -1;
+}
+
+bool PlayStoreApp::isInstalled(int catalogIdx) const {
+    if (catalogIdx < 0 || catalogIdx >= CATALOG_COUNT) return false;
+    return StorageHAL::fileExists(STORE_CATALOG[catalogIdx].localPath);
 }
 
 int PlayStoreApp::getMaxScroll(int listH) const {
-    int totalH = CATALOG_COUNT * ROW_H + 8;
+    int totalH = getFilteredCount() * ROW_H + 8;
     int maxS = totalH - listH;
     return (maxS > 0) ? maxS : 0;
 }
@@ -608,6 +210,7 @@ void PlayStoreApp::onRender(TFT_eSPI &display, int vx, int vy, int vw, int vh) {
 }
 
 void PlayStoreApp::drawHeader(TFT_eSPI &display, int vx, int vy, int vw) {
+    // 1. Top Title Bar (22px)
     display.fillRect(vx, vy, vw, 22, 0x0352);
     display.setTextFont(1);
     display.setTextDatum(TL_DATUM);
@@ -617,35 +220,61 @@ void PlayStoreApp::drawHeader(TFT_eSPI &display, int vx, int vy, int vw) {
     bool wifiOk = (WiFi.status() == WL_CONNECTED);
     display.setTextDatum(TR_DATUM);
     display.setTextColor(wifiOk ? 0x07E0 : 0xFFE0, 0x0352);
-    display.drawString(wifiOk ? "CLOUD ONLINE" : "OFFLINE CACHE", vx + vw - 6, vy + 7);
+    display.drawString(wifiOk ? "CLOUD ONLINE" : "NO WI-FI", vx + vw - 6, vy + 7);
 
+    // 2. Main Tab Bar (22px at vy + 22)
     int tabY = vy + 22;
     int halfW = vw / 2;
     uint16_t t0Bg = (m_activeTab == 0) ? 0x18E3 : 0x0821;
     uint16_t t1Bg = (m_activeTab == 1) ? 0x18E3 : 0x0821;
 
-    display.fillRect(vx, tabY, halfW, 24, t0Bg);
-    display.fillRect(vx + halfW, tabY, vw - halfW, 24, t1Bg);
-    display.drawFastHLine(vx, tabY + 23, vw, 0x3186);
+    display.fillRect(vx, tabY, halfW, 22, t0Bg);
+    display.fillRect(vx + halfW, tabY, vw - halfW, 22, t1Bg);
+    display.drawFastHLine(vx, tabY + 21, vw, 0x3186);
 
     if (m_activeTab == 0) {
-        display.fillRect(vx + 6, tabY + 21, halfW - 12, 2, 0x07E0);
+        display.fillRect(vx + 6, tabY + 19, halfW - 12, 2, 0x07E0);
     } else {
-        display.fillRect(vx + halfW + 6, tabY + 21, halfW - 12, 2, 0x07FF);
+        display.fillRect(vx + halfW + 6, tabY + 19, halfW - 12, 2, 0x07FF);
     }
 
     display.setTextDatum(MC_DATUM);
     display.setTextColor((m_activeTab == 0) ? TFT_WHITE : 0x8410, t0Bg);
-    display.drawString("FEATURED (6)", vx + halfW / 2, tabY + 12);
+    display.drawString("STORE CATALOG (8)", vx + halfW / 2, tabY + 11);
 
     display.setTextColor((m_activeTab == 1) ? TFT_WHITE : 0x8410, t1Bg);
-    display.drawString("URL / GITHUB", vx + halfW + halfW / 2, tabY + 12);
+    display.drawString("CUSTOM URL / GIT", vx + halfW + halfW / 2, tabY + 11);
+
+    // 3. Category Filter Bar (24px at vy + 44)
+    int catY = vy + 44;
+    display.fillRect(vx, catY, vw, 24, 0x0C63);
+    display.drawFastHLine(vx, catY + 23, vw, 0x2965);
+
+    if (m_activeTab == 0) {
+        static const char* CAT_LABELS[5] = { "ALL", "NET", "GAMES", "MEDIA", "TOOLS" };
+        int pillW = 44;
+        for (int c = 0; c < 5; c++) {
+            int px = vx + 4 + c * 47;
+            bool active = (m_activeCategory == c);
+            uint16_t pBg = active ? 0x04D3 : 0x18E3;
+            uint16_t pBo = active ? 0x07FF : 0x3186;
+            display.fillRoundRect(px, catY + 3, pillW, 18, 4, pBg);
+            display.drawRoundRect(px, catY + 3, pillW, 18, 4, pBo);
+            display.setTextColor(active ? TFT_WHITE : 0x9CD3, pBg);
+            display.drawString(CAT_LABELS[c], px + pillW / 2, catY + 12);
+        }
+    } else {
+        display.setTextColor(0x07FF, 0x0C63);
+        display.drawString("github.com/VexisTheFox/cydos_appstore", vx + vw / 2, catY + 12);
+    }
+
     display.setTextDatum(TL_DATUM);
 }
 
 void PlayStoreApp::drawListArea(TFT_eSPI &display, int vx, int vy, int vw, int vh) {
     int listTop = vy + HEADER_H;
     int listH   = vh - HEADER_H - FOOTER_H;
+    int filteredCount = getFilteredCount();
 
     TFT_eSprite band(&display);
     band.setColorDepth(16);
@@ -660,42 +289,52 @@ void PlayStoreApp::drawListArea(TFT_eSPI &display, int vx, int vy, int vw, int v
 
         canvas.fillRect(baseX, baseY, vw, curH, 0x0821);
 
-        for (int i = 0; i < CATALOG_COUNT; i++) {
-            int rowDocY = 4 + i * ROW_H;
+        for (int fIdx = 0; fIdx < filteredCount; fIdx++) {
+            int rowDocY = 4 + fIdx * ROW_H;
             int rowScreenY = rowDocY - m_scrollY - yOff;
             if (rowScreenY + ROW_H <= 0 || rowScreenY >= curH) continue;
 
+            int catIdx = getCatalogIndexFromFiltered(fIdx);
+            if (catIdx < 0) continue;
+
             int ry = baseY + rowScreenY;
-            bool sel = (i == m_selectedIndex);
-            bool inst = isInstalled(i);
-            const StoreCatalogItem &item = STORE_CATALOG[i];
+            bool sel = (fIdx == m_selectedIndex);
+            bool inst = isInstalled(catIdx);
+            const StoreCatalogItem &item = STORE_CATALOG[catIdx];
 
             uint16_t cardBg = sel ? 0x1949 : 0x10A2;
             uint16_t border = sel ? 0x07FF : 0x2965;
 
-            canvas.fillRoundRect(baseX + 6, ry, vw - 14, ROW_H - 4, 5, cardBg);
-            canvas.drawRoundRect(baseX + 6, ry, vw - 14, ROW_H - 4, 5, border);
+            canvas.fillRoundRect(baseX + 6, ry, vw - 12, ROW_H - 4, 5, cardBg);
+            canvas.drawRoundRect(baseX + 6, ry, vw - 12, ROW_H - 4, 5, border);
 
             // Render custom Base64 logo inside 28x28 rounded badge
             canvas.fillRoundRect(baseX + 11, ry + 5, 28, 28, 5, item.iconBg);
             canvas.drawRoundRect(baseX + 11, ry + 5, 28, 28, 5, 0x4A69);
             core::LuaIconCodec::drawBase64Icon(canvas, item.iconB64, baseX + 25, ry + 19, TFT_WHITE, 1);
 
+            // App Title + Category Badge
             canvas.setTextFont(1);
             canvas.setTextDatum(TL_DATUM);
             canvas.setTextColor(TFT_WHITE, cardBg);
-            canvas.drawString(item.title, baseX + 45, ry + 6);
+            canvas.drawString(item.title, baseX + 44, ry + 6);
 
+            char catBadge[16];
+            snprintf(catBadge, sizeof(catBadge), "[%s]", item.categoryName);
+            canvas.setTextColor(0xFFE0, cardBg);
+            canvas.drawString(catBadge, baseX + 116, ry + 6);
+
+            // Description
             canvas.setTextColor(0x9CD3, cardBg);
-            canvas.drawString(item.desc, baseX + 45, ry + 20);
+            canvas.drawString(item.desc, baseX + 44, ry + 20);
 
             // Status pill
             uint16_t pillBg = inst ? 0x03E0 : 0x0276;
             uint16_t pillFg = inst ? TFT_WHITE : 0x07FF;
-            canvas.fillRoundRect(baseX + vw - 66, ry + 6, 52, 14, 3, pillBg);
+            canvas.fillRoundRect(baseX + vw - 64, ry + 5, 52, 13, 3, pillBg);
             canvas.setTextDatum(MC_DATUM);
             canvas.setTextColor(pillFg, pillBg);
-            canvas.drawString(inst ? "INSTALLED" : "GET APP", baseX + vw - 40, ry + 13);
+            canvas.drawString(inst ? "INSTALLED" : "GET OTA", baseX + vw - 38, ry + 11);
             canvas.setTextDatum(TL_DATUM);
         }
 
@@ -714,15 +353,16 @@ void PlayStoreApp::drawFooter(TFT_eSPI &display, int vx, int vy, int vw, int vh)
     display.fillRect(vx, footY, vw, FOOTER_H, 0x10A2);
     display.drawFastHLine(vx, footY, vw, 0x3186);
 
-    bool inst = isInstalled(m_selectedIndex);
+    int catIdx = getCatalogIndexFromFiltered(m_selectedIndex);
+    bool inst = isInstalled(catIdx);
 
-    // Button 1: INSTALL or UPDATE
+    // Button 1: INSTALL or UPDATE from VexisTheFox/cydos_appstore
     display.fillRoundRect(vx + 6, footY + 5, 86, 26, 5, 0x04D3);
     display.drawRoundRect(vx + 6, footY + 5, 86, 26, 5, 0x07E0);
     display.setTextFont(1);
     display.setTextDatum(MC_DATUM);
     display.setTextColor(TFT_WHITE, 0x04D3);
-    display.drawString(inst ? "REINSTALL" : "INSTALL", vx + 49, footY + 18);
+    display.drawString(inst ? "UPDATE OTA" : "INSTALL OTA", vx + 49, footY + 18);
 
     // Button 2: OPEN
     uint16_t openBg = inst ? 0x2C9F : 0x18E3;
@@ -749,10 +389,10 @@ void PlayStoreApp::drawUrlTab(TFT_eSPI &display, int vx, int vy, int vw, int vh)
     display.setTextDatum(TL_DATUM);
 
     // Card 1: Custom URL
-    display.fillRoundRect(8, bodyY + 8, vw - 16, 62, 5, 0x10A2);
-    display.drawRoundRect(8, bodyY + 8, vw - 16, 62, 5, 0x3186);
+    display.fillRoundRect(8, bodyY + 6, vw - 16, 58, 5, 0x10A2);
+    display.drawRoundRect(8, bodyY + 6, vw - 16, 58, 5, 0x3186);
     display.setTextColor(0x07FF, 0x10A2);
-    display.drawString("1. Lua Script URL (Tap to Edit):", 14, bodyY + 14);
+    display.drawString("1. Lua Script URL (Tap to Edit):", 14, bodyY + 12);
     display.setTextColor(TFT_WHITE, 0x10A2);
     char u1[36], u2[36];
     strncpy(u1, m_customUrl, 34); u1[34] = '\0';
@@ -762,32 +402,32 @@ void PlayStoreApp::drawUrlTab(TFT_eSPI &display, int vx, int vy, int vw, int vh)
     } else {
         u2[0] = '\0';
     }
-    display.drawString(u1, 14, bodyY + 30);
+    display.drawString(u1, 14, bodyY + 26);
     display.setTextColor(0x9CD3, 0x10A2);
-    display.drawString(u2, 14, bodyY + 44);
+    display.drawString(u2, 14, bodyY + 40);
 
     // Card 2: Target Filename
-    display.fillRoundRect(8, bodyY + 76, vw - 16, 38, 5, 0x10A2);
-    display.drawRoundRect(8, bodyY + 76, vw - 16, 38, 5, 0x3186);
+    display.fillRoundRect(8, bodyY + 70, vw - 16, 36, 5, 0x10A2);
+    display.drawRoundRect(8, bodyY + 70, vw - 16, 36, 5, 0x3186);
     display.setTextColor(0xFFE0, 0x10A2);
-    display.drawString("2. Save As (/apps/):", 14, bodyY + 84);
+    display.drawString("2. Save As (/apps/):", 14, bodyY + 76);
     display.setTextColor(TFT_WHITE, 0x10A2);
-    display.drawString(m_customFile, 14, bodyY + 98);
+    display.drawString(m_customFile, 14, bodyY + 90);
 
     // Status Card
-    display.fillRoundRect(8, bodyY + 120, vw - 16, 36, 5, 0x10A2);
-    display.drawRoundRect(8, bodyY + 120, vw - 16, 36, 5, 0x2965);
+    display.fillRoundRect(8, bodyY + 112, vw - 16, 36, 5, 0x10A2);
+    display.drawRoundRect(8, bodyY + 112, vw - 16, 36, 5, 0x2965);
     display.setTextColor(0x07E0, 0x10A2);
-    display.drawString("Status:", 14, bodyY + 126);
+    display.drawString("Status:", 14, bodyY + 118);
     display.setTextColor(TFT_WHITE, 0x10A2);
-    display.drawString(m_statusLine, 14, bodyY + 140);
+    display.drawString(m_statusLine, 14, bodyY + 132);
 
     // Download & Install Button
-    display.fillRoundRect(16, bodyY + 168, vw - 32, 42, 6, 0x04D3);
-    display.drawRoundRect(16, bodyY + 168, vw - 32, 42, 6, 0x07E0);
+    display.fillRoundRect(16, bodyY + 156, vw - 32, 40, 6, 0x04D3);
+    display.drawRoundRect(16, bodyY + 156, vw - 32, 40, 6, 0x07E0);
     display.setTextDatum(MC_DATUM);
     display.setTextColor(TFT_WHITE, 0x04D3);
-    display.drawString("DOWNLOAD & INSTALL TO HOME", vx + vw / 2, bodyY + 189);
+    display.drawString("DOWNLOAD & INSTALL TO HOME", vx + vw / 2, bodyY + 176);
     display.setTextDatum(TL_DATUM);
 }
 
@@ -821,7 +461,7 @@ static bool streamHttpToFile(HTTPClient& http, const char* destPath) {
                 if (len > 0) len -= c;
                 lastAct = millis();
             }
-        } else if (millis() - lastAct > 3500) {
+        } else if (millis() - lastAct > 4000) {
             break;
         }
         delay(1);
@@ -842,57 +482,52 @@ bool PlayStoreApp::downloadUrlToPath(const char* url, const char* destPath) {
         WiFiClientSecure secureClient;
         secureClient.setInsecure();
         HTTPClient http;
-        http.setConnectTimeout(3500);
-        http.setTimeout(3500);
+        http.setConnectTimeout(4500);
+        http.setTimeout(4500);
         http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
         if (!http.begin(secureClient, url)) return false;
         return streamHttpToFile(http, destPath);
     } else {
         WiFiClient client;
         HTTPClient http;
-        http.setConnectTimeout(3500);
-        http.setTimeout(3500);
+        http.setConnectTimeout(4500);
+        http.setTimeout(4500);
         http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
         if (!http.begin(client, url)) return false;
         return streamHttpToFile(http, destPath);
     }
 }
 
-void PlayStoreApp::installFeaturedApp(int idx) {
-    if (idx < 0 || idx >= CATALOG_COUNT) return;
-    const StoreCatalogItem &item = STORE_CATALOG[idx];
+void PlayStoreApp::installFeaturedApp(int catalogIdx) {
+    if (catalogIdx < 0 || catalogIdx >= CATALOG_COUNT) return;
+    const StoreCatalogItem &item = STORE_CATALOG[catalogIdx];
 
-    // Fast, deterministic PROGMEM package install (zero TLS heap overhead, zero crash risk)
-    StorageHAL::ensureDirectory("/apps");
-    File f = LittleFS.open(item.localPath, "w");
-    if (f) {
-        size_t len = strlen_P(item.progmemSrc);
-        const uint8_t* ptr = (const uint8_t*)item.progmemSrc;
-        uint8_t chunk[128];
-        size_t written = 0;
-        while (written < len) {
-            size_t n = (len - written > sizeof(chunk)) ? sizeof(chunk) : (len - written);
-            memcpy_P(chunk, ptr + written, n);
-            f.write(chunk, n);
-            written += n;
-        }
-        f.flush();
-        f.close();
+    if (WiFi.status() != WL_CONNECTED) {
+        ui::UIManager::showToast("Connect Wi-Fi in Settings first!", 1800);
+        return;
     }
 
-    core::AppRegistry::scanFilesystemApps();
-    LOG_INFO("STORE", "Installed %s -> %s", item.title, item.localPath);
+    char dlMsg[44];
+    snprintf(dlMsg, sizeof(dlMsg), "Downloading %s...", item.title);
+    ui::UIManager::showToast(dlMsg, 1200);
 
-    char msg[44];
-    snprintf(msg, sizeof(msg), "Installed %s to Home!", item.title);
-    ui::UIManager::showToast(msg, 1500);
+    if (downloadUrlToPath(item.cloudUrl, item.localPath)) {
+        core::AppRegistry::scanFilesystemApps();
+        LOG_INFO("STORE", "OTA Installed %s from cydos_appstore -> %s", item.title, item.localPath);
+        char msg[44];
+        snprintf(msg, sizeof(msg), "Installed %s to Home!", item.title);
+        ui::UIManager::showToast(msg, 1600);
+    } else {
+        LOG_ERROR("STORE", "OTA download failed for %s (%s)", item.title, item.cloudUrl);
+        ui::UIManager::showToast("OTA Download Failed", 1600);
+    }
     m_needsFullRedraw = true;
 }
 
-void PlayStoreApp::uninstallFeaturedApp(int idx) {
-    if (idx < 0 || idx >= CATALOG_COUNT) return;
-    const StoreCatalogItem &item = STORE_CATALOG[idx];
-    if (!isInstalled(idx)) return;
+void PlayStoreApp::uninstallFeaturedApp(int catalogIdx) {
+    if (catalogIdx < 0 || catalogIdx >= CATALOG_COUNT) return;
+    const StoreCatalogItem &item = STORE_CATALOG[catalogIdx];
+    if (!isInstalled(catalogIdx)) return;
 
     LittleFS.remove(item.localPath);
     core::AppRegistry::rescan();
@@ -904,12 +539,13 @@ void PlayStoreApp::uninstallFeaturedApp(int idx) {
     m_needsFullRedraw = true;
 }
 
-void PlayStoreApp::openFeaturedApp(int idx) {
-    if (idx < 0 || idx >= CATALOG_COUNT) return;
-    if (!isInstalled(idx)) {
-        installFeaturedApp(idx);
+void PlayStoreApp::openFeaturedApp(int catalogIdx) {
+    if (catalogIdx < 0 || catalogIdx >= CATALOG_COUNT) return;
+    if (!isInstalled(catalogIdx)) {
+        installFeaturedApp(catalogIdx);
+        if (!isInstalled(catalogIdx)) return;
     }
-    const StoreCatalogItem &item = STORE_CATALOG[idx];
+    const StoreCatalogItem &item = STORE_CATALOG[catalogIdx];
     int appIdx = core::AppRegistry::findAppIndex(item.id);
     if (appIdx < 0) appIdx = core::AppRegistry::findAppIndex(item.title);
     if (appIdx >= 0) {
@@ -964,8 +600,8 @@ void PlayStoreApp::onTouch(uint16_t x, uint16_t y, bool pressed) {
 }
 
 void PlayStoreApp::handleTap(int16_t rx, int16_t ry, int vw, int vh) {
-    // 1. Tab Bar
-    if (ry >= 22 && ry < HEADER_H) {
+    // 1. Main Tab Bar (ry = 22..43)
+    if (ry >= 22 && ry < 44) {
         uint8_t newTab = (rx < vw / 2) ? 0 : 1;
         if (newTab != m_activeTab) {
             hal::beep(20);
@@ -975,16 +611,31 @@ void PlayStoreApp::handleTap(int16_t rx, int16_t ry, int vw, int vh) {
         return;
     }
 
+    // 2. Category Filter Bar (ry = 44..67)
+    if (ry >= 44 && ry < HEADER_H && m_activeTab == 0) {
+        int cat = (rx - 4) / 47;
+        if (cat >= 0 && cat <= 4 && (uint8_t)cat != m_activeCategory) {
+            hal::beep(18);
+            m_activeCategory = (uint8_t)cat;
+            m_selectedIndex = 0;
+            m_scrollY = 0;
+            m_needsFullRedraw = true;
+        }
+        return;
+    }
+
     if (m_activeTab == 0) {
         // List area tap
         if (ry >= HEADER_H && ry < (vh - FOOTER_H)) {
             int docY = (ry - HEADER_H) + m_scrollY - 4;
-            int idx = docY / ROW_H;
-            if (idx >= 0 && idx < CATALOG_COUNT) {
+            int fIdx = docY / ROW_H;
+            int filteredCount = getFilteredCount();
+            if (fIdx >= 0 && fIdx < filteredCount) {
                 hal::beep(20);
-                m_selectedIndex = (int16_t)idx;
-                if (rx >= vw - 70) {
-                    installFeaturedApp(idx);
+                m_selectedIndex = (int16_t)fIdx;
+                int catIdx = getCatalogIndexFromFiltered(fIdx);
+                if (rx >= vw - 70 && catIdx >= 0) {
+                    installFeaturedApp(catIdx);
                 } else {
                     m_needsListRedraw = true;
                     m_needsFooterRedraw = true;
@@ -995,20 +646,22 @@ void PlayStoreApp::handleTap(int16_t rx, int16_t ry, int vw, int vh) {
 
         // Footer buttons
         if (ry >= (vh - FOOTER_H)) {
+            int catIdx = getCatalogIndexFromFiltered(m_selectedIndex);
+            if (catIdx < 0) return;
             hal::beep(25);
             if (rx < 94) {
-                installFeaturedApp(m_selectedIndex);
+                installFeaturedApp(catIdx);
             } else if (rx < 168) {
-                openFeaturedApp(m_selectedIndex);
+                openFeaturedApp(catIdx);
             } else {
-                uninstallFeaturedApp(m_selectedIndex);
+                uninstallFeaturedApp(catIdx);
             }
             return;
         }
     } else {
         // Tab 1: Custom URL Installer
         int bodyY = HEADER_H;
-        if (ry >= bodyY + 8 && ry <= bodyY + 70) {
+        if (ry >= bodyY + 6 && ry <= bodyY + 64) {
             hal::beep(20);
             char outUrl[128] = {0};
             if (ui::KeyboardView::prompt("Enter .lua Script URL", m_customUrl, outUrl, sizeof(outUrl))) {
@@ -1018,7 +671,7 @@ void PlayStoreApp::handleTap(int16_t rx, int16_t ry, int vw, int vh) {
                 }
             }
             m_needsFullRedraw = true;
-        } else if (ry >= bodyY + 76 && ry <= bodyY + 114) {
+        } else if (ry >= bodyY + 70 && ry <= bodyY + 106) {
             hal::beep(20);
             char outFile[32] = {0};
             if (ui::KeyboardView::prompt("Filename in /apps/", m_customFile, outFile, sizeof(outFile))) {
@@ -1028,7 +681,7 @@ void PlayStoreApp::handleTap(int16_t rx, int16_t ry, int vw, int vh) {
                 }
             }
             m_needsFullRedraw = true;
-        } else if (ry >= bodyY + 168 && ry <= bodyY + 214) {
+        } else if (ry >= bodyY + 156 && ry <= bodyY + 200) {
             hal::beep(30);
             snprintf(m_statusLine, sizeof(m_statusLine), "Downloading via HTTP/TLS...");
             m_needsFullRedraw = true;
@@ -1038,7 +691,7 @@ void PlayStoreApp::handleTap(int16_t rx, int16_t ry, int vw, int vh) {
             snprintf(dest, sizeof(dest), "/apps/%s", m_customFile);
             if (downloadUrlToPath(m_customUrl, dest)) {
                 core::AppRegistry::scanFilesystemApps();
-                snprintf(m_statusLine, sizeof(m_statusLine), "Installed %s to Home!", dest);
+                snprintf(m_statusLine, sizeof(m_statusLine), "Installed to /apps/!");
                 ui::UIManager::showToast("URL App Installed!", 1600);
             } else {
                 snprintf(m_statusLine, sizeof(m_statusLine), "Download failed (Check Wi-Fi/URL)");

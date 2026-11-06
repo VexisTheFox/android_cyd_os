@@ -2,10 +2,14 @@
  * @file PlayStoreApp.h
  * @brief Native Android-Style Play Store & OTA Lua App Downloader for CYD OS
  *
+ * Connected to official cloud repository:
+ *   https://github.com/VexisTheFox/cydos_appstore
+ *
  * Features:
- *   - Browse featured Lua apps with custom Base64 icons (-- @icon_b64) & custom names (-- @name)
- *   - One-tap Wi-Fi OTA download from GitHub (with instant offline PROGMEM fallback)
- *   - Custom HTTPS/HTTP URL installer with 512-byte chunked streaming to /apps/
+ *   - Browse featured Lua apps organized by category (ALL, NET, GAMES, MEDIA, TOOLS)
+ *   - Renders custom Base64 icons (-- @icon_b64) & custom names (-- @name)
+ *   - One-tap Wi-Fi OTA download from VexisTheFox/cydos_appstore to /apps/
+ *   - Custom HTTPS/HTTP URL installer with 256-byte chunked streaming to /apps/
  *   - Launch or uninstall store apps directly and sync Home Screen launcher pages
  */
 
@@ -17,16 +21,24 @@
 
 namespace apps {
 
+enum class StoreCategory : uint8_t {
+    ALL       = 0,
+    INTERNET  = 1,
+    GAMES     = 2,
+    MEDIA     = 3,
+    UTILITIES = 4
+};
+
 struct StoreCatalogItem {
-    const char* id;
-    const char* title;
-    const char* category;
-    const char* desc;
-    const char* localPath;
-    const char* cloudUrl;
-    const char* iconB64;
-    uint16_t    iconBg;
-    const char* progmemSrc;
+    const char*   id;
+    const char*   title;
+    const char*   categoryName;
+    StoreCategory category;
+    const char*   desc;
+    const char*   localPath;
+    const char*   cloudUrl;
+    const char*   iconB64;
+    uint16_t      iconBg;
 };
 
 class PlayStoreApp : public core::App {
@@ -47,13 +59,14 @@ public:
     const char* getCategory() const override { return "System"; }
 
 private:
-    static constexpr int HEADER_H  = 46; // Title bar (22px) + Tab bar (24px)
+    static constexpr int HEADER_H  = 68; // Title (22px) + Tab bar (22px) + Category bar (24px)
     static constexpr int FOOTER_H  = 36; // Action buttons bar at bottom
     static constexpr int ROW_H     = 42; // Height of each store app card
 
-    uint8_t  m_activeTab;      // 0 = FEATURED APPS, 1 = URL / OTA GET
+    uint8_t  m_activeTab;       // 0 = APP STORE CATALOG, 1 = CUSTOM URL
+    uint8_t  m_activeCategory;  // 0 = ALL, 1 = NET, 2 = GAMES, 3 = MEDIA, 4 = TOOLS
     int16_t  m_scrollY;
-    int16_t  m_selectedIndex;
+    int16_t  m_selectedIndex;   // Index into filtered items (or catalog)
     bool     m_wasPressed;
     bool     m_isDragging;
     int16_t  m_touchStartY;
@@ -69,7 +82,9 @@ private:
     char     m_customFile[32];
     char     m_statusLine[48];
 
-    bool isInstalled(int idx) const;
+    int  getFilteredCount() const;
+    int  getCatalogIndexFromFiltered(int filteredIdx) const;
+    bool isInstalled(int catalogIdx) const;
     int  getMaxScroll(int listH) const;
 
     void drawHeader(TFT_eSPI &display, int vx, int vy, int vw);
@@ -78,9 +93,9 @@ private:
     void drawFooter(TFT_eSPI &display, int vx, int vy, int vw, int vh);
 
     void handleTap(int16_t rx, int16_t ry, int vw, int vh);
-    void installFeaturedApp(int idx);
-    void uninstallFeaturedApp(int idx);
-    void openFeaturedApp(int idx);
+    void installFeaturedApp(int catalogIdx);
+    void uninstallFeaturedApp(int catalogIdx);
+    void openFeaturedApp(int catalogIdx);
     bool downloadUrlToPath(const char* url, const char* destPath);
 };
 
