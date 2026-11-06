@@ -1146,11 +1146,6 @@ static int l_http_request_impl(lua_State* L, const char* method, const char* url
     pumpOS();
     checkAbort(L);
 
-    HTTPClient http;
-    http.setConnectTimeout(timeoutMs);
-    http.setTimeout(timeoutMs);
-    http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
-
     bool isHttps = (strncasecmp(url, "https://", 8) == 0);
     int httpCode = -1;
     String payload;
@@ -1165,8 +1160,13 @@ static int l_http_request_impl(lua_State* L, const char* method, const char* url
             lua_pushstring(L, "Low SRAM for TLS");
             return 3;
         }
+        // Declare WiFiClientSecure BEFORE HTTPClient so HTTPClient destructor runs first!
         WiFiClientSecure secureClient;
         secureClient.setInsecure(); // Skip CA chain allocation to save ~40 KB SRAM
+        HTTPClient http;
+        http.setConnectTimeout(timeoutMs);
+        http.setTimeout(timeoutMs);
+        http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
         if (!http.begin(secureClient, url)) {
             lua_pushnil(L);
             lua_pushinteger(L, -2);
@@ -1201,7 +1201,12 @@ static int l_http_request_impl(lua_State* L, const char* method, const char* url
         }
         http.end();
     } else {
+        // Declare WiFiClient BEFORE HTTPClient so HTTPClient destructor runs first!
         WiFiClient client;
+        HTTPClient http;
+        http.setConnectTimeout(timeoutMs);
+        http.setTimeout(timeoutMs);
+        http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
         if (!http.begin(client, url)) {
             lua_pushnil(L);
             lua_pushinteger(L, -2);
@@ -1307,84 +1312,82 @@ static int http_download(lua_State* L) {
         return 3;
     }
 
-    HTTPClient http;
-    http.setConnectTimeout(5000);
-    http.setTimeout(5000);
-    http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
-
-    WiFiClient client;
-    WiFiClientSecure secureClient;
-    bool begun = false;
-    if (isHttps) {
-        secureClient.setInsecure();
-        begun = http.begin(secureClient, url);
-    } else {
-        begun = http.begin(client, url);
-    }
-
-    if (!begun) {
-        lua_pushboolean(L, 0);
-        lua_pushinteger(L, 0);
-        lua_pushinteger(L, -2);
-        return 3;
-    }
-
-    int httpCode = http.GET();
-    if (httpCode != HTTP_CODE_OK) {
-        http.end();
-        lua_pushboolean(L, 0);
-        lua_pushinteger(L, 0);
-        lua_pushinteger(L, httpCode);
-        return 3;
-    }
-
-    if (strncmp(path, "/apps/", 6) == 0) {
-        StorageHAL::ensureDirectory("/apps");
-    }
-
-    File f;
-    if (strncmp(path, "/sd/", 4) == 0) {
-        f = SD.open(path + 3, FILE_WRITE);
-    } else {
-        f = LittleFS.open(path, "w");
-    }
-
-    if (!f) {
-        http.end();
-        lua_pushboolean(L, 0);
-        lua_pushinteger(L, 0);
-        lua_pushinteger(L, -3);
-        return 3;
-    }
-
-    WiFiClient* stream = http.getStreamPtr();
-    uint8_t buff[512];
-    int totalBytes = 0;
-    int len = http.getSize();
-    uint32_t lastActivity = millis();
-
-    while ((http.connected() || (stream && stream->available() > 0)) && (len > 0 || len == -1)) {
-        size_t avail = stream ? stream->available() : 0;
-        if (avail) {
-            int toRead = (avail > sizeof(buff)) ? (int)sizeof(buff) : (int)avail;
-            int c = stream->readBytes(buff, toRead);
-            if (c > 0) {
-                f.write(buff, c);
-                totalBytes += c;
-                if (len > 0) len -= c;
-                lastActivity = millis();
-            }
-        } else if (millis() - lastActivity > 5000) {
-            break;
+    auto streamToDestination = [&](HTTPClient &http, int &outTotalBytes, int &outHttpCode) {
+        outHttpCode = http.GET();
+        if (outHttpCode != HTTP_CODE_OK) {
+            http.end();
+            return;
         }
-        pumpOS();
-        if (s_abort) break;
-        delay(1);
-    }
 
-    f.flush();
-    f.close();
-    http.end();
+        if (strncmp(path, "/apps/", 6) == 0) {
+            StorageHAL::ensureDirectory("/apps");
+        }
+
+        File f;
+        if (strncmp(path, "/sd/", 4) == 0) {
+            f = SD.open(path + 3, FILE_WRITE);
+        } else {
+            f = LittleFS.open(path, "w");
+        }
+
+        if (!f) {
+            http.end();
+            outHttpCode = -3;
+            return;
+        }
+
+        WiFiClient* stream = http.getStreamPtr();
+        uint8_t buff[512];
+        int len = http.getSize();
+        uint32_t lastActivity = millis();
+
+        while ((http.connected() || (stream && stream->available() > 0)) && (len > 0 || len == -1)) {
+            size_t avail = stream ? stream->available() : 0;
+            if (avail) {
+                int toRead = (avail > sizeof(buff)) ? (int)sizeof(buff) : (int)avail;
+                int c = stream->readBytes(buff, toRead);
+                if (c > 0) {
+                    f.write(buff, c);
+                    outTotalBytes += c;
+                    if (len > 0) len -= c;
+                    lastActivity = millis();
+                }
+            } else if (millis() - lastActivity > 5000) {
+                break;
+            }
+            pumpOS();
+            if (s_abort) break;
+            delay(1);
+        }
+
+        f.flush();
+        f.close();
+        http.end();
+    };
+
+    int totalBytes = 0;
+    int httpCode = -2;
+    if (isHttps) {
+        // Declare WiFiClientSecure BEFORE HTTPClient so HTTPClient destructor runs first!
+        WiFiClientSecure secureClient;
+        secureClient.setInsecure();
+        HTTPClient http;
+        http.setConnectTimeout(5000);
+        http.setTimeout(5000);
+        http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+        if (http.begin(secureClient, url)) {
+            streamToDestination(http, totalBytes, httpCode);
+        }
+    } else {
+        WiFiClient client;
+        HTTPClient http;
+        http.setConnectTimeout(5000);
+        http.setTimeout(5000);
+        http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+        if (http.begin(client, url)) {
+            streamToDestination(http, totalBytes, httpCode);
+        }
+    }
 
     if (s_abort) {
         checkAbort(L);
@@ -1459,10 +1462,95 @@ static int net_getTime(lua_State* L) {
     return 8;
 }
 
+static const luaL_Reg kGuiLib[] = {
+    {"fillRect", gui_fillRect}, {"drawRect", gui_drawRect}, {"drawText", gui_drawText},
+    {"drawLine", gui_drawLine}, {"drawFastHLine", gui_drawFastHLine},
+    {"fillCircle", gui_fillCircle}, {"drawPixel", gui_drawPixel},
+    {"drawImage", gui_drawImage}, {"drawBase64", gui_drawBase64},
+    {"createSampleImages", gui_createSampleImages},
+    {"keyboard", gui_keyboard},
+    {nullptr, nullptr}};
+
+static const luaL_Reg kInputLib[] = {{"getTouch", input_getTouch}, {nullptr, nullptr}};
+
+static const luaL_Reg kSysLib[] = {
+    {"delay", sys_delay}, {"beep", sys_beep}, {"getHeap", sys_getHeap},
+    {"getLdr", sys_getLdr}, {"getUptime", sys_getUptime},
+    {"getTime", sys_getTime}, {"syncNTP", sys_syncNTP}, {"getRegion", sys_getRegion},
+    {"getStorageTotal", sys_getStorageTotal}, {"getStorageUsed", sys_getStorageUsed},
+    {"isSDMounted", sys_isSDMounted}, {"probeSD", sys_probeSD},
+    {"getKernelLog", sys_getKernelLog}, {"clearKernelLog", sys_clearKernelLog},
+    {"syncKernelLog", sys_syncKernelLog}, {"log", sys_log},
+    {"isDevMode", sys_isDevMode}, {"setDevMode", sys_setDevMode},
+    {"installApp", sys_installApp}, {"lockScreen", sys_lockScreen},
+    {"setLED", sys_setLED}, {"setBrightness", sys_setBrightness},
+    {"setOrientation", sys_setOrientation}, {"getOrientation", sys_getOrientation},
+    {"getViewport", sys_getViewport}, {"getScreenSize", sys_getScreenSize},
+    {"launch", sys_launch}, {"runScript", sys_runScript}, {nullptr, nullptr}};
+
+static const luaL_Reg kFileLib[] = {
+    {"list", file_list}, {"listImages", file_listImages},
+    {"read", file_read}, {"write", file_write},
+    {"remove", file_remove}, {"exists", file_exists},
+    {"run", sys_runScript}, {nullptr, nullptr}};
+
+static const luaL_Reg kWifiLib[] = {
+    {"isPrepared", wifi_isPrepared}, {"isEnabled", wifi_isEnabled},
+    {"setEnabled", wifi_setEnabled}, {"getStatus", wifi_getStatus},
+    {"getMac", wifi_getMac}, {"getSSID", wifi_getSSID},
+    {"getIP", wifi_getIP}, {"getRSSI", wifi_getRSSI},
+    {"connect", wifi_connect}, {"disconnect", wifi_disconnect},
+    {"scan", wifi_scan}, {nullptr, nullptr}};
+
+static const luaL_Reg kHttpLib[] = {
+    {"get", http_get}, {"post", http_post},
+    {"request", http_request}, {"download", http_download},
+    {nullptr, nullptr}};
+
+static const luaL_Reg kNetLib[] = {
+    {"ping", net_ping}, {"getTime", net_getTime}, {"syncNTP", sys_syncNTP},
+    {"get", http_get}, {"post", http_post},
+    {"request", http_request}, {"download", http_download},
+    {nullptr, nullptr}};
+
 static void registerLib(lua_State* L, const char* name, const luaL_Reg* funcs) {
-    lua_createtable(L, 0, 16);
+    int count = 0;
+    while (funcs[count].name != nullptr) count++;
+    lua_createtable(L, 0, count);
     luaL_setfuncs(L, funcs, 0);
     lua_setglobal(L, name);
+}
+
+// Lazy C-module loader attached to _G.__index:
+// Only allocates file, wifi, http, or net tables when a Lua script actually accesses them!
+static int lazyGlobalIndex(lua_State* L) {
+    const char* key = lua_tostring(L, 2);
+    if (!key) {
+        lua_pushnil(L);
+        return 1;
+    }
+
+    const luaL_Reg* targetFuncs = nullptr;
+    if (strcmp(key, "file") == 0)      targetFuncs = kFileLib;
+    else if (strcmp(key, "wifi") == 0) targetFuncs = kWifiLib;
+    else if (strcmp(key, "http") == 0) targetFuncs = kHttpLib;
+    else if (strcmp(key, "net") == 0)  targetFuncs = kNetLib;
+
+    if (!targetFuncs) {
+        lua_pushnil(L);
+        return 1;
+    }
+
+    int count = 0;
+    while (targetFuncs[count].name != nullptr) count++;
+    lua_createtable(L, 0, count);
+    luaL_setfuncs(L, targetFuncs, 0);
+
+    // Cache table directly in _G[key] so subsequent accesses have zero metatable overhead
+    lua_pushvalue(L, 2); // key
+    lua_pushvalue(L, -2); // table
+    lua_rawset(L, 1);     // _G[key] = table
+    return 1;             // return table on top of stack
 }
 
 static void openSandbox(lua_State* L) {
@@ -1475,57 +1563,19 @@ static void openSandbox(lua_State* L) {
     lua_pushnil(L); lua_setglobal(L, "dofile");
     lua_pushnil(L); lua_setglobal(L, "loadfile");
 
-    static const luaL_Reg guiLib[] = {
-        {"fillRect", gui_fillRect}, {"drawRect", gui_drawRect}, {"drawText", gui_drawText},
-        {"drawLine", gui_drawLine}, {"drawFastHLine", gui_drawFastHLine},
-        {"fillCircle", gui_fillCircle}, {"drawPixel", gui_drawPixel},
-        {"drawImage", gui_drawImage}, {"drawBase64", gui_drawBase64},
-        {"createSampleImages", gui_createSampleImages},
-        {"keyboard", gui_keyboard},
-        {nullptr, nullptr}};
-    static const luaL_Reg inputLib[] = {{"getTouch", input_getTouch}, {nullptr, nullptr}};
-    static const luaL_Reg sysLib[] = {
-        {"delay", sys_delay}, {"beep", sys_beep}, {"getHeap", sys_getHeap},
-        {"getLdr", sys_getLdr}, {"getUptime", sys_getUptime},
-        {"getTime", sys_getTime}, {"syncNTP", sys_syncNTP}, {"getRegion", sys_getRegion},
-        {"getStorageTotal", sys_getStorageTotal}, {"getStorageUsed", sys_getStorageUsed},
-        {"isSDMounted", sys_isSDMounted}, {"probeSD", sys_probeSD},
-        {"getKernelLog", sys_getKernelLog}, {"clearKernelLog", sys_clearKernelLog},
-        {"syncKernelLog", sys_syncKernelLog}, {"log", sys_log},
-        {"isDevMode", sys_isDevMode}, {"setDevMode", sys_setDevMode},
-        {"installApp", sys_installApp}, {"lockScreen", sys_lockScreen},
-        {"setLED", sys_setLED}, {"setBrightness", sys_setBrightness},
-        {"setOrientation", sys_setOrientation}, {"getOrientation", sys_getOrientation},
-        {"getViewport", sys_getViewport}, {"getScreenSize", sys_getScreenSize},
-        {"launch", sys_launch}, {"runScript", sys_runScript}, {nullptr, nullptr}};
-    static const luaL_Reg fileLib[] = {
-        {"list", file_list}, {"listImages", file_listImages},
-        {"read", file_read}, {"write", file_write},
-        {"remove", file_remove}, {"exists", file_exists},
-        {"run", sys_runScript}, {nullptr, nullptr}};
-    static const luaL_Reg wifiLib[] = {
-        {"isPrepared", wifi_isPrepared}, {"isEnabled", wifi_isEnabled},
-        {"setEnabled", wifi_setEnabled}, {"getStatus", wifi_getStatus},
-        {"getMac", wifi_getMac}, {"getSSID", wifi_getSSID},
-        {"getIP", wifi_getIP}, {"getRSSI", wifi_getRSSI},
-        {"connect", wifi_connect}, {"disconnect", wifi_disconnect},
-        {"scan", wifi_scan}, {nullptr, nullptr}};
-    static const luaL_Reg httpLib[] = {
-        {"get", http_get}, {"post", http_post},
-        {"request", http_request}, {"download", http_download},
-        {nullptr, nullptr}};
-    static const luaL_Reg netLib[] = {
-        {"ping", net_ping}, {"getTime", net_getTime}, {"syncNTP", sys_syncNTP},
-        {"get", http_get}, {"post", http_post},
-        {"request", http_request}, {"download", http_download},
-        {nullptr, nullptr}};
-    registerLib(L, "gui", guiLib);
-    registerLib(L, "input", inputLib);
-    registerLib(L, "sys", sysLib);
-    registerLib(L, "file", fileLib);
-    registerLib(L, "wifi", wifiLib);
-    registerLib(L, "http", httpLib);
-    registerLib(L, "net", netLib);
+    // Eagerly load only core display/input/system primitives
+    registerLib(L, "gui", kGuiLib);
+    registerLib(L, "input", kInputLib);
+    registerLib(L, "sys", kSysLib);
+
+    // Attach lazy __index metatable to _G so file, wifi, http, and net C modules
+    // are instantiated ONLY when an app actually uses them!
+    lua_pushglobaltable(L);
+    lua_createtable(L, 0, 1);
+    lua_pushcfunction(L, lazyGlobalIndex);
+    lua_setfield(L, -2, "__index");
+    lua_setmetatable(L, -2);
+    lua_pop(L, 1);
 }
 
 // ------------------------------------------------------------- app logic

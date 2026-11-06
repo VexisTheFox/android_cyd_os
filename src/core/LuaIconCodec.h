@@ -1,6 +1,6 @@
 /**
  * @file LuaIconCodec.h
- * @brief Lightweight Base64 Logo Decoder & Lua Script Metadata Parser
+ * @brief Lightweight Base64 Logo Decoder & Lua Script Metadata Parser (Zero-Heap, Low-Stack)
  *
  * Supports declaring custom app metadata in the top header of any .lua script:
  *   -- @name: Weather Live
@@ -9,14 +9,6 @@
  * or via Lua globals:
  *   _APP_NAME = "Weather Live"
  *   _APP_ICON_B64 = "<base64 payload>"
- *
- * Supported Base64 icon formats (auto-detected by decoded byte size):
- *   - 32 bytes : 16x16 1-bit monochrome mask (drawn 2x -> 32x32 px using fgColor)
- *   - 34 bytes : 2-byte RGB565 color (big-endian) + 32-byte 16x16 1-bit mask (drawn 2x -> 32x32 px)
- *   - 64 bytes : 16x16 2-bit 4-color icon (0=transparent, 1=White, 2=Cyan 0x07FF, 3=Yellow 0xFFE0, drawn 2x -> 32x32 px)
- *   - 68 bytes : 4-byte (2x RGB565 colors) + 64-byte 16x16 2-bit icon (0=trans, 1=White, 2=Col1, 3=Col2, drawn 2x -> 32x32 px)
- *   - 256 bytes: 16x16 8-bit RGB332 color icon (0x00=transparent, drawn 2x -> 32x32 px)
- *   - 512 bytes: 16x16 16-bit RGB565 color icon (0x0000=transparent, drawn 2x -> 32x32 px)
  */
 
 #pragma once
@@ -83,15 +75,13 @@ public:
 
     /**
      * @brief Render a Base64-encoded icon centered at (cx, cy).
-     * @param scale Pixel multiplier for 16x16 icons (default 2 -> 32x32 px; use 1 for 16x16 px in compact lists)
-     * @return true if a valid Base64 icon was decoded and drawn
      */
     static bool drawBase64Icon(TFT_eSPI &canvas, const char* b64, int16_t cx, int16_t cy,
                                uint16_t fgColor = TFT_WHITE, uint8_t scale = 2) {
         if (!b64 || b64[0] == '\0') return false;
         if (scale == 0) scale = 1;
 
-        uint8_t raw[520];
+        uint8_t raw[260];
         size_t n = decodeBase64(b64, raw, sizeof(raw));
         if (n < 32) return false;
 
@@ -146,7 +136,7 @@ public:
         }
 
         // Format C: 256 bytes (16x16 RGB332)
-        if (n >= 256 && n < 512) {
+        if (n >= 256) {
             for (int r = 0; r < 16; r++) {
                 for (int c = 0; c < 16; c++) {
                     uint8_t v = raw[r * 16 + c];
@@ -160,27 +150,12 @@ public:
             return true;
         }
 
-        // Format D: 512 bytes (16x16 RGB565 big-endian)
-        if (n >= 512) {
-            for (int r = 0; r < 16; r++) {
-                for (int c = 0; c < 16; c++) {
-                    int idx = (r * 16 + c) * 2;
-                    uint16_t col = ((uint16_t)raw[idx] << 8) | raw[idx + 1];
-                    if (col != 0x0000) {
-                        if (scale == 1) canvas.drawPixel(x0 + c, y0 + r, col);
-                        else canvas.fillRect(x0 + c * scale, y0 + r * scale, scale, scale, col);
-                    }
-                }
-            }
-            return true;
-        }
-
         return false;
     }
 
     /**
-     * @brief Parse header metadata (-- @name, -- @bg, -- @icon_b64) from the first 960 bytes of a Lua file.
-     * Zero dynamic memory allocation.
+     * @brief Parse header metadata (-- @name, -- @bg, -- @icon_b64) from the first 480 bytes of a Lua file.
+     * Uses a compact 480B buffer so it never stresses the FreeRTOS task stack.
      */
     static bool parseScriptHeader(const char* path,
                                   char* outName, size_t maxName,
@@ -198,7 +173,7 @@ public:
         }
         if (!f) return false;
 
-        char buf[960];
+        char buf[480];
         size_t nRead = f.readBytes(buf, sizeof(buf) - 1);
         f.close();
         buf[nRead] = '\0';
@@ -295,7 +270,7 @@ public:
      */
     static bool drawCustomScriptIcon(TFT_eSPI &canvas, const char* path, int16_t cx, int16_t cy,
                                      uint16_t fgColor = TFT_WHITE, uint8_t scale = 2) {
-        char b64[700] = {0};
+        char b64[360] = {0};
         if (!parseScriptHeader(path, nullptr, 0, nullptr, b64, sizeof(b64))) {
             return false;
         }

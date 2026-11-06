@@ -791,27 +791,7 @@ void PlayStoreApp::drawUrlTab(TFT_eSPI &display, int vx, int vy, int vw, int vh)
     display.setTextDatum(TL_DATUM);
 }
 
-bool PlayStoreApp::downloadUrlToPath(const char* url, const char* destPath) {
-    if (WiFi.status() != WL_CONNECTED) return false;
-    if (xPortGetFreeHeapSize() < 48000) return false;
-
-    HTTPClient http;
-    http.setConnectTimeout(3500);
-    http.setTimeout(3500);
-    http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
-
-    bool isHttps = (strncasecmp(url, "https://", 8) == 0);
-    WiFiClient client;
-    WiFiClientSecure secureClient;
-    bool begun = false;
-    if (isHttps) {
-        secureClient.setInsecure();
-        begun = http.begin(secureClient, url);
-    } else {
-        begun = http.begin(client, url);
-    }
-    if (!begun) return false;
-
+static bool streamHttpToFile(HTTPClient& http, const char* destPath) {
     int code = http.GET();
     if (code != HTTP_CODE_OK) {
         http.end();
@@ -826,7 +806,7 @@ bool PlayStoreApp::downloadUrlToPath(const char* url, const char* destPath) {
     }
 
     WiFiClient* stream = http.getStreamPtr();
-    uint8_t buff[512];
+    uint8_t buff[256];
     int total = 0;
     int len = http.getSize();
     uint32_t lastAct = millis();
@@ -852,39 +832,56 @@ bool PlayStoreApp::downloadUrlToPath(const char* url, const char* destPath) {
     return (total > 16);
 }
 
+bool PlayStoreApp::downloadUrlToPath(const char* url, const char* destPath) {
+    if (WiFi.status() != WL_CONNECTED) return false;
+    if (xPortGetFreeHeapSize() < 48000) return false;
+
+    bool isHttps = (strncasecmp(url, "https://", 8) == 0);
+    if (isHttps) {
+        // CRITICAL: Declare WiFiClientSecure BEFORE HTTPClient so HTTPClient is destroyed FIRST!
+        WiFiClientSecure secureClient;
+        secureClient.setInsecure();
+        HTTPClient http;
+        http.setConnectTimeout(3500);
+        http.setTimeout(3500);
+        http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+        if (!http.begin(secureClient, url)) return false;
+        return streamHttpToFile(http, destPath);
+    } else {
+        WiFiClient client;
+        HTTPClient http;
+        http.setConnectTimeout(3500);
+        http.setTimeout(3500);
+        http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+        if (!http.begin(client, url)) return false;
+        return streamHttpToFile(http, destPath);
+    }
+}
+
 void PlayStoreApp::installFeaturedApp(int idx) {
     if (idx < 0 || idx >= CATALOG_COUNT) return;
     const StoreCatalogItem &item = STORE_CATALOG[idx];
 
-    ui::UIManager::showToast("Installing from Play Store...", 900);
-
-    bool cloudOk = false;
-    if (WiFi.status() == WL_CONNECTED) {
-        cloudOk = downloadUrlToPath(item.cloudUrl, item.localPath);
-    }
-
-    if (!cloudOk) {
-        // Offline / Instant PROGMEM package write
-        StorageHAL::ensureDirectory("/apps");
-        File f = LittleFS.open(item.localPath, "w");
-        if (f) {
-            size_t len = strlen_P(item.progmemSrc);
-            const uint8_t* ptr = (const uint8_t*)item.progmemSrc;
-            uint8_t chunk[128];
-            size_t written = 0;
-            while (written < len) {
-                size_t n = (len - written > sizeof(chunk)) ? sizeof(chunk) : (len - written);
-                memcpy_P(chunk, ptr + written, n);
-                f.write(chunk, n);
-                written += n;
-            }
-            f.flush();
-            f.close();
+    // Fast, deterministic PROGMEM package install (zero TLS heap overhead, zero crash risk)
+    StorageHAL::ensureDirectory("/apps");
+    File f = LittleFS.open(item.localPath, "w");
+    if (f) {
+        size_t len = strlen_P(item.progmemSrc);
+        const uint8_t* ptr = (const uint8_t*)item.progmemSrc;
+        uint8_t chunk[128];
+        size_t written = 0;
+        while (written < len) {
+            size_t n = (len - written > sizeof(chunk)) ? sizeof(chunk) : (len - written);
+            memcpy_P(chunk, ptr + written, n);
+            f.write(chunk, n);
+            written += n;
         }
+        f.flush();
+        f.close();
     }
 
     core::AppRegistry::scanFilesystemApps();
-    LOG_INFO("STORE", "Installed %s (%s) -> %s", item.title, cloudOk ? "Cloud" : "Bundled", item.localPath);
+    LOG_INFO("STORE", "Installed %s -> %s", item.title, item.localPath);
 
     char msg[44];
     snprintf(msg, sizeof(msg), "Installed %s to Home!", item.title);
@@ -916,8 +913,7 @@ void PlayStoreApp::openFeaturedApp(int idx) {
     int appIdx = core::AppRegistry::findAppIndex(item.id);
     if (appIdx < 0) appIdx = core::AppRegistry::findAppIndex(item.title);
     if (appIdx >= 0) {
-        core::App* app = core::AppRegistry::getApp((size_t)appIdx);
-        if (app) ui::UIManager::launchApp(app);
+        ui::UIManager::launchApp((size_t)appIdx);
     }
 }
 

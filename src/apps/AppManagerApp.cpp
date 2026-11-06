@@ -283,7 +283,7 @@ void AppManagerApp::drawListArea(TFT_eSPI &display, int vx, int vy, int vw, int 
                     canvas.setTextFont(1);
                     const char* typeTag = "[SYSTEM C++]";
                     uint16_t tagCol = COL_CYAN;
-                    if (desc->isDynamic) {
+                    if (desc->path[0] != '\0') {
                         if (strncmp(desc->path, "/sd/", 4) == 0) {
                             typeTag = "[SD CARD]";
                             tagCol = COL_ORANGE;
@@ -385,7 +385,7 @@ void AppManagerApp::drawFooter(TFT_eSPI &display, int vx, int vy, int vw, int vh
 
         // Button 2: UNINSTALL / RESET (X=124..234)
         const core::AppDescriptor* desc = core::AppRegistry::getAppInfo((size_t)m_selectedIndex);
-        bool canModify = (desc && desc->isDynamic);
+        bool canModify = (desc && desc->path[0] != '\0');
         uint16_t uBg = canModify ? 0x7800 : 0x2104;
         uint16_t uBorder = canModify ? COL_RED : COL_BORDER;
         const char* uLabel = "CORE SYSTEM";
@@ -502,9 +502,8 @@ void AppManagerApp::performSecondaryAction() {
             LittleFS.remove(targetPath);
         }
 
-        // Rebuild AppRegistry cleanly so Home Screen updates immediately
-        core::AppRegistry::clear();
-        core::AppRegistry::init();
+        // Rescan AppRegistry cleanly so uninstalled app is pruned and Home Screen updates immediately
+        core::AppRegistry::rescan();
 
         int newCount = (int)core::AppRegistry::getAppCount();
         if (m_selectedIndex >= newCount) {
