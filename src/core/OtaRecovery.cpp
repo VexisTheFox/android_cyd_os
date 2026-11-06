@@ -18,7 +18,7 @@ namespace core {
 
 static const char* OTA_NVS_NS   = "cyd_ota";
 static const char* OTA_NVS_KEY  = "ota_pend";
-static const char* OTA_REL_URL  = "https://github.com/VexisTheFox/android_cyd_os/releases/latest/download/cyd2usb-firmware.bin";
+static const char* OTA_REL_URL  = "https://github.com/VexisTheFox/android_cyd_os/releases/latest/download/cyd2usb-firmware-0x10000.bin";
 
 static void drawRecoveryScreen(const char* stage, const char* detail, int pct, uint16_t barCol = 0x07E0) {
     TFT_eSPI &tft = hal::getDisplay();
@@ -184,6 +184,7 @@ void OtaRecovery::checkAndRunOnBoot() {
         HTTPClient http;
         http.setConnectTimeout(10000);
         http.setTimeout(15000);
+        http.setRedirectLimit(5);
         http.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
 
         if (http.begin(client, OTA_REL_URL)) {
