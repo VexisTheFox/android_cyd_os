@@ -1,0 +1,1611 @@
+{
+  "timestamp": "2026-11-05T14:35:14Z",
+  "total": 264,
+  "passed": 264,
+  "failed": 0,
+  "duration": 32.52096962928772,
+  "tiers": {
+    "1": {
+      "pass": 120,
+      "fail": 0
+    },
+    "2": {
+      "pass": 120,
+      "fail": 0
+    },
+    "3": {
+      "pass": 16,
+      "fail": 0
+    },
+    "4": {
+      "pass": 8,
+      "fail": 0
+    }
+  },
+  "tests": [
+    {
+      "test_id": "test_f01_f06_shell.TestF01BootSplash.test_f01_01_splash_renders_on_screen",
+      "status": "PASS",
+      "duration": 0.002415180206298828,
+      "error": null
+    },
+    {
+      "test_id": "test_f01_f06_shell.TestF01BootSplash.test_f01_02_splash_clears_screen_to_black",
+      "status": "PASS",
+      "duration": 0.003155946731567383,
+      "error": null
+    },
+    {
+      "test_id": "test_f01_f06_shell.TestF01BootSplash.test_f01_03_splash_color_branding",
+      "status": "PASS",
+      "duration": 0.0019383430480957031,
+      "error": null
+    },
+    {
+      "test_id": "test_f01_f06_shell.TestF01BootSplash.test_f01_04_splash_progress_frame_exists",
+      "status": "PASS",
+      "duration": 0.0019807815551757812,
+      "error": null
+    },
+    {
+      "test_id": "test_f01_f06_shell.TestF01BootSplash.test_f01_05_splash_initial_status_text",
+      "status": "PASS",
+      "duration": 0.0019712448120117188,
+      "error": null
+    },
+    {
+      "test_id": "test_f01_f06_shell.TestF02BootProgress.test_f02_01_progress_increments_percentage",
+      "status": "PASS",
+      "duration": 0.0019702911376953125,
+      "error": null
+    },
+    {
+      "test_id": "test_f01_f06_shell.TestF02BootProgress.test_f02_02_progress_fill_bar_dimensions",
+      "status": "PASS",
+      "duration": 0.001985788345336914,
+      "error": null
+    },
+    {
+      "test_id": "test_f01_f06_shell.TestF02BootProgress.test_f02_03_progress_100_percent_completion",
+      "status": "PASS",
+      "duration": 0.001995563507080078,
+      "error": null
+    },
+    {
+      "test_id": "test_f01_f06_shell.TestF02BootProgress.test_f02_04_progress_clamping_over_100",
+      "status": "PASS",
+      "duration": 0.0020575523376464844,
+      "error": null
+    },
+    {
+      "test_id": "test_f01_f06_shell.TestF02BootProgress.test_f02_05_subsystem_labels_sequence",
+      "status": "PASS",
+      "duration": 0.005242347717285156,
+      "error": null
+    },
+    {
+      "test_id": "test_f01_f06_shell.TestF03BootTransition.test_f03_01_initial_state_is_boot",
+      "status": "PASS",
+      "duration": 0.001966238021850586,
+      "error": null
+    },
+    {
+      "test_id": "test_f01_f06_shell.TestF03BootTransition.test_f03_02_transition_switches_state_to_launcher",
+      "status": "PASS",
+      "duration": 0.005152702331542969,
+      "error": null
+    },
+    {
+      "test_id": "test_f01_f06_shell.TestF03BootTransition.test_f03_03_transition_renders_chrome",
+      "status": "PASS",
+      "duration": 0.006395816802978516,
+      "error": null
+    },
+    {
+      "test_id": "test_f01_f06_shell.TestF03BootTransition.test_f03_04_transition_clears_boot_logo",
+      "status": "PASS",
+      "duration": 0.005295753479003906,
+      "error": null
+    },
+    {
+      "test_id": "test_f01_f06_shell.TestF03BootTransition.test_f03_05_transition_readies_touch_handling",
+      "status": "PASS",
+      "duration": 0.0029387474060058594,
+      "error": null
+    },
+    {
+      "test_id": "test_f01_f06_shell.TestF04StatusBar.test_f04_01_status_bar_dimensions",
+      "status": "PASS",
+      "duration": 0.0010194778442382812,
+      "error": null
+    },
+    {
+      "test_id": "test_f01_f06_shell.TestF04StatusBar.test_f04_02_status_bar_live_clock",
+      "status": "PASS",
+      "duration": 0.0010132789611816406,
+      "error": null
+    },
+    {
+      "test_id": "test_f01_f06_shell.TestF04StatusBar.test_f04_03_status_bar_heap_meter",
+      "status": "PASS",
+      "duration": 0.0009944438934326172,
+      "error": null
+    },
+    {
+      "test_id": "test_f01_f06_shell.TestF04StatusBar.test_f04_04_status_bar_storage_indicator",
+      "status": "PASS",
+      "duration": 0.0010902881622314453,
+      "error": null
+    },
+    {
+      "test_id": "test_f01_f06_shell.TestF04StatusBar.test_f04_05_status_bar_battery_icon",
+      "status": "PASS",
+      "duration": 0.0009946823120117188,
+      "error": null
+    },
+    {
+      "test_id": "test_f01_f06_shell.TestF05HomeLauncher.test_f05_01_grid_renders_registered_apps",
+      "status": "PASS",
+      "duration": 0.0018219947814941406,
+      "error": null
+    },
+    {
+      "test_id": "test_f01_f06_shell.TestF05HomeLauncher.test_f05_02_grid_icon_dimensions",
+      "status": "PASS",
+      "duration": 0.002106189727783203,
+      "error": null
+    },
+    {
+      "test_id": "test_f01_f06_shell.TestF05HomeLauncher.test_f05_03_grid_hitbox_touch_slot_0",
+      "status": "PASS",
+      "duration": 0.0009713172912597656,
+      "error": null
+    },
+    {
+      "test_id": "test_f01_f06_shell.TestF05HomeLauncher.test_f05_04_grid_hitbox_touch_slot_1",
+      "status": "PASS",
+      "duration": 0.0009765625,
+      "error": null
+    },
+    {
+      "test_id": "test_f01_f06_shell.TestF05HomeLauncher.test_f05_05_touch_outside_slots_returns_none",
+      "status": "PASS",
+      "duration": 0.0009169578552246094,
+      "error": null
+    },
+    {
+      "test_id": "test_f01_f06_shell.TestF06NavBar.test_f06_01_nav_bar_dimensions",
+      "status": "PASS",
+      "duration": 0.0010800361633300781,
+      "error": null
+    },
+    {
+      "test_id": "test_f01_f06_shell.TestF06NavBar.test_f06_02_nav_bar_renders_three_icons",
+      "status": "PASS",
+      "duration": 0.0010523796081542969,
+      "error": null
+    },
+    {
+      "test_id": "test_f01_f06_shell.TestF06NavBar.test_f06_03_back_touch_hitbox",
+      "status": "PASS",
+      "duration": 0.00092315673828125,
+      "error": null
+    },
+    {
+      "test_id": "test_f01_f06_shell.TestF06NavBar.test_f06_04_home_touch_hitbox",
+      "status": "PASS",
+      "duration": 0.0009260177612304688,
+      "error": null
+    },
+    {
+      "test_id": "test_f01_f06_shell.TestF06NavBar.test_f06_05_tasks_touch_hitbox",
+      "status": "PASS",
+      "duration": 0.0009644031524658203,
+      "error": null
+    },
+    {
+      "test_id": "test_f07_f10_app_framework.TestF07AppFramework.test_f07_01_app_initial_state",
+      "status": "PASS",
+      "duration": 2.0742416381835938e-05,
+      "error": null
+    },
+    {
+      "test_id": "test_f07_f10_app_framework.TestF07AppFramework.test_f07_02_app_on_create_lifecycle",
+      "status": "PASS",
+      "duration": 9.775161743164062e-06,
+      "error": null
+    },
+    {
+      "test_id": "test_f07_f10_app_framework.TestF07AppFramework.test_f07_03_app_on_resume_and_pause_lifecycle",
+      "status": "PASS",
+      "duration": 8.344650268554688e-06,
+      "error": null
+    },
+    {
+      "test_id": "test_f07_f10_app_framework.TestF07AppFramework.test_f07_04_app_on_render_invocation",
+      "status": "PASS",
+      "duration": 0.0027239322662353516,
+      "error": null
+    },
+    {
+      "test_id": "test_f07_f10_app_framework.TestF07AppFramework.test_f07_05_app_on_touch_event_handling",
+      "status": "PASS",
+      "duration": 2.4318695068359375e-05,
+      "error": null
+    },
+    {
+      "test_id": "test_f07_f10_app_framework.TestF08DynamicAppDiscovery.test_f08_01_discovery_from_littlefs",
+      "status": "PASS",
+      "duration": 6.175041198730469e-05,
+      "error": null
+    },
+    {
+      "test_id": "test_f07_f10_app_framework.TestF08DynamicAppDiscovery.test_f08_02_ignore_non_lua_files",
+      "status": "PASS",
+      "duration": 2.193450927734375e-05,
+      "error": null
+    },
+    {
+      "test_id": "test_f07_f10_app_framework.TestF08DynamicAppDiscovery.test_f08_03_discovery_from_microsd",
+      "status": "PASS",
+      "duration": 1.33514404296875e-05,
+      "error": null
+    },
+    {
+      "test_id": "test_f07_f10_app_framework.TestF08DynamicAppDiscovery.test_f08_04_sd_unmounted_ignores_sd_apps",
+      "status": "PASS",
+      "duration": 7.62939453125e-06,
+      "error": null
+    },
+    {
+      "test_id": "test_f07_f10_app_framework.TestF08DynamicAppDiscovery.test_f08_05_idempotent_discovery",
+      "status": "PASS",
+      "duration": 1.8358230590820312e-05,
+      "error": null
+    },
+    {
+      "test_id": "test_f07_f10_app_framework.TestF09DynamicAppLaunch.test_f09_01_launch_sets_active_app",
+      "status": "PASS",
+      "duration": 1.8596649169921875e-05,
+      "error": null
+    },
+    {
+      "test_id": "test_f07_f10_app_framework.TestF09DynamicAppLaunch.test_f09_02_launch_triggers_create_and_resume",
+      "status": "PASS",
+      "duration": 1.52587890625e-05,
+      "error": null
+    },
+    {
+      "test_id": "test_f07_f10_app_framework.TestF09DynamicAppLaunch.test_f09_03_launch_switches_running_apps",
+      "status": "PASS",
+      "duration": 1.049041748046875e-05,
+      "error": null
+    },
+    {
+      "test_id": "test_f07_f10_app_framework.TestF09DynamicAppLaunch.test_f09_04_ui_manager_launch_updates_state",
+      "status": "PASS",
+      "duration": 0.004410743713378906,
+      "error": null
+    },
+    {
+      "test_id": "test_f07_f10_app_framework.TestF09DynamicAppLaunch.test_f09_05_invalid_index_launch_fails",
+      "status": "PASS",
+      "duration": 2.1457672119140625e-05,
+      "error": null
+    },
+    {
+      "test_id": "test_f07_f10_app_framework.TestF10DynamicAppExit.test_f10_01_exit_clears_active_app",
+      "status": "PASS",
+      "duration": 0.0009810924530029297,
+      "error": null
+    },
+    {
+      "test_id": "test_f07_f10_app_framework.TestF10DynamicAppExit.test_f10_02_exit_pauses_app",
+      "status": "PASS",
+      "duration": 0.0009253025054931641,
+      "error": null
+    },
+    {
+      "test_id": "test_f07_f10_app_framework.TestF10DynamicAppExit.test_f10_03_nav_home_triggers_exit",
+      "status": "PASS",
+      "duration": 0.006130218505859375,
+      "error": null
+    },
+    {
+      "test_id": "test_f07_f10_app_framework.TestF10DynamicAppExit.test_f10_04_nav_back_triggers_exit",
+      "status": "PASS",
+      "duration": 0.006166696548461914,
+      "error": null
+    },
+    {
+      "test_id": "test_f07_f10_app_framework.TestF10DynamicAppExit.test_f10_05_exit_restores_launcher_view",
+      "status": "PASS",
+      "duration": 0.006846189498901367,
+      "error": null
+    },
+    {
+      "test_id": "test_f11_f16_scripting.TestF11ScriptEngine.test_f11_01_engine_initialization",
+      "status": "PASS",
+      "duration": 0.0009295940399169922,
+      "error": null
+    },
+    {
+      "test_id": "test_f11_f16_scripting.TestF11ScriptEngine.test_f11_02_engine_state_before_execution",
+      "status": "PASS",
+      "duration": 0.0009107589721679688,
+      "error": null
+    },
+    {
+      "test_id": "test_f11_f16_scripting.TestF11ScriptEngine.test_f11_03_engine_simple_expression",
+      "status": "PASS",
+      "duration": 0.0018877983093261719,
+      "error": null
+    },
+    {
+      "test_id": "test_f11_f16_scripting.TestF11ScriptEngine.test_f11_04_engine_uninitialized_execution_rejected",
+      "status": "PASS",
+      "duration": 0.0008835792541503906,
+      "error": null
+    },
+    {
+      "test_id": "test_f11_f16_scripting.TestF11ScriptEngine.test_f11_05_engine_reinitialization_resets_state",
+      "status": "PASS",
+      "duration": 0.0008924007415771484,
+      "error": null
+    },
+    {
+      "test_id": "test_f11_f16_scripting.TestF12ScriptFileExecution.test_f12_01_execute_littlefs_script",
+      "status": "PASS",
+      "duration": 0.000993490219116211,
+      "error": null
+    },
+    {
+      "test_id": "test_f11_f16_scripting.TestF12ScriptFileExecution.test_f12_02_execute_bundled_calc_script",
+      "status": "PASS",
+      "duration": 0.0019524097442626953,
+      "error": null
+    },
+    {
+      "test_id": "test_f11_f16_scripting.TestF12ScriptFileExecution.test_f12_03_execute_bundled_paint_script",
+      "status": "PASS",
+      "duration": 0.0020418167114257812,
+      "error": null
+    },
+    {
+      "test_id": "test_f11_f16_scripting.TestF12ScriptFileExecution.test_f12_04_execute_non_existent_file_fails",
+      "status": "PASS",
+      "duration": 0.0009012222290039062,
+      "error": null
+    },
+    {
+      "test_id": "test_f11_f16_scripting.TestF12ScriptFileExecution.test_f12_05_execute_from_sd_storage",
+      "status": "PASS",
+      "duration": 0.0009984970092773438,
+      "error": null
+    },
+    {
+      "test_id": "test_f11_f16_scripting.TestF13GUIScriptBindings.test_f13_01_gui_clear",
+      "status": "PASS",
+      "duration": 0.0018470287322998047,
+      "error": null
+    },
+    {
+      "test_id": "test_f11_f16_scripting.TestF13GUIScriptBindings.test_f13_02_gui_draw_text",
+      "status": "PASS",
+      "duration": 0.0009515285491943359,
+      "error": null
+    },
+    {
+      "test_id": "test_f11_f16_scripting.TestF13GUIScriptBindings.test_f13_03_gui_draw_rect",
+      "status": "PASS",
+      "duration": 0.0009131431579589844,
+      "error": null
+    },
+    {
+      "test_id": "test_f11_f16_scripting.TestF13GUIScriptBindings.test_f13_04_gui_fill_rect",
+      "status": "PASS",
+      "duration": 0.0009424686431884766,
+      "error": null
+    },
+    {
+      "test_id": "test_f11_f16_scripting.TestF13GUIScriptBindings.test_f13_05_gui_color_format_rgb565",
+      "status": "PASS",
+      "duration": 0.0018775463104248047,
+      "error": null
+    },
+    {
+      "test_id": "test_f11_f16_scripting.TestF14SysBindings.test_f14_01_sys_set_backlight",
+      "status": "PASS",
+      "duration": 0.001008749008178711,
+      "error": null
+    },
+    {
+      "test_id": "test_f11_f16_scripting.TestF14SysBindings.test_f14_02_sys_set_rgb_led",
+      "status": "PASS",
+      "duration": 0.001184701919555664,
+      "error": null
+    },
+    {
+      "test_id": "test_f11_f16_scripting.TestF14SysBindings.test_f14_03_input_touch_query",
+      "status": "PASS",
+      "duration": 0.0011205673217773438,
+      "error": null
+    },
+    {
+      "test_id": "test_f11_f16_scripting.TestF14SysBindings.test_f14_04_sys_backlight_clamping",
+      "status": "PASS",
+      "duration": 0.0011570453643798828,
+      "error": null
+    },
+    {
+      "test_id": "test_f11_f16_scripting.TestF14SysBindings.test_f14_05_board_tone_generation",
+      "status": "PASS",
+      "duration": 0.0011248588562011719,
+      "error": null
+    },
+    {
+      "test_id": "test_f11_f16_scripting.TestF15ScriptSandboxWDT.test_f15_01_instruction_hook_increments",
+      "status": "PASS",
+      "duration": 0.0022966861724853516,
+      "error": null
+    },
+    {
+      "test_id": "test_f11_f16_scripting.TestF15ScriptSandboxWDT.test_f15_02_wdt_feed_on_counter_rollover",
+      "status": "PASS",
+      "duration": 0.00106048583984375,
+      "error": null
+    },
+    {
+      "test_id": "test_f11_f16_scripting.TestF15ScriptSandboxWDT.test_f15_03_instruction_limit_abort",
+      "status": "PASS",
+      "duration": 0.0050373077392578125,
+      "error": null
+    },
+    {
+      "test_id": "test_f11_f16_scripting.TestF15ScriptSandboxWDT.test_f15_04_manual_abort_flag",
+      "status": "PASS",
+      "duration": 0.0010809898376464844,
+      "error": null
+    },
+    {
+      "test_id": "test_f11_f16_scripting.TestF15ScriptSandboxWDT.test_f15_05_safe_state_after_abort",
+      "status": "PASS",
+      "duration": 0.0010938644409179688,
+      "error": null
+    },
+    {
+      "test_id": "test_f11_f16_scripting.TestF16ZeroCrashErrorTrapping.test_f16_01_syntax_error_trapped",
+      "status": "PASS",
+      "duration": 0.0011203289031982422,
+      "error": null
+    },
+    {
+      "test_id": "test_f11_f16_scripting.TestF16ZeroCrashErrorTrapping.test_f16_02_runtime_error_trapped",
+      "status": "PASS",
+      "duration": 0.001157999038696289,
+      "error": null
+    },
+    {
+      "test_id": "test_f11_f16_scripting.TestF16ZeroCrashErrorTrapping.test_f16_03_modal_error_dialog_renders",
+      "status": "PASS",
+      "duration": 0.0016510486602783203,
+      "error": null
+    },
+    {
+      "test_id": "test_f11_f16_scripting.TestF16ZeroCrashErrorTrapping.test_f16_04_modal_error_dismissal",
+      "status": "PASS",
+      "duration": 0.0034890174865722656,
+      "error": null
+    },
+    {
+      "test_id": "test_f11_f16_scripting.TestF16ZeroCrashErrorTrapping.test_f16_05_modal_error_dismissal_via_home_nav",
+      "status": "PASS",
+      "duration": 0.003520965576171875,
+      "error": null
+    },
+    {
+      "test_id": "test_f17_f21_apps_settings.TestF17BundledApplications.test_f17_01_bundled_calc_present",
+      "status": "PASS",
+      "duration": 0.0009171962738037109,
+      "error": null
+    },
+    {
+      "test_id": "test_f17_f21_apps_settings.TestF17BundledApplications.test_f17_02_bundled_paint_present",
+      "status": "PASS",
+      "duration": 0.0008792877197265625,
+      "error": null
+    },
+    {
+      "test_id": "test_f17_f21_apps_settings.TestF17BundledApplications.test_f17_03_bundled_sysinfo_present",
+      "status": "PASS",
+      "duration": 0.0008802413940429688,
+      "error": null
+    },
+    {
+      "test_id": "test_f17_f21_apps_settings.TestF17BundledApplications.test_f17_04_bundled_su7_native_app_renders",
+      "status": "PASS",
+      "duration": 0.0016865730285644531,
+      "error": null
+    },
+    {
+      "test_id": "test_f17_f21_apps_settings.TestF17BundledApplications.test_f17_05_bundled_apps_icons",
+      "status": "PASS",
+      "duration": 0.0009105205535888672,
+      "error": null
+    },
+    {
+      "test_id": "test_f17_f21_apps_settings.TestF18SettingsInterface.test_f18_01_settings_app_name",
+      "status": "PASS",
+      "duration": 0.000896453857421875,
+      "error": null
+    },
+    {
+      "test_id": "test_f17_f21_apps_settings.TestF18SettingsInterface.test_f18_02_settings_renders_header",
+      "status": "PASS",
+      "duration": 0.0017404556274414062,
+      "error": null
+    },
+    {
+      "test_id": "test_f17_f21_apps_settings.TestF18SettingsInterface.test_f18_03_settings_renders_brightness_label",
+      "status": "PASS",
+      "duration": 0.0017235279083251953,
+      "error": null
+    },
+    {
+      "test_id": "test_f17_f21_apps_settings.TestF18SettingsInterface.test_f18_04_settings_background_color",
+      "status": "PASS",
+      "duration": 0.0018205642700195312,
+      "error": null
+    },
+    {
+      "test_id": "test_f17_f21_apps_settings.TestF18SettingsInterface.test_f18_05_settings_touch_interaction",
+      "status": "PASS",
+      "duration": 0.0009198188781738281,
+      "error": null
+    },
+    {
+      "test_id": "test_f17_f21_apps_settings.TestF19LiveHardwareControl.test_f19_01_pwm_backlight_default",
+      "status": "PASS",
+      "duration": 1.9550323486328125e-05,
+      "error": null
+    },
+    {
+      "test_id": "test_f17_f21_apps_settings.TestF19LiveHardwareControl.test_f19_02_pwm_backlight_adjustment",
+      "status": "PASS",
+      "duration": 8.821487426757812e-06,
+      "error": null
+    },
+    {
+      "test_id": "test_f17_f21_apps_settings.TestF19LiveHardwareControl.test_f19_03_active_low_rgb_led_control",
+      "status": "PASS",
+      "duration": 1.2636184692382812e-05,
+      "error": null
+    },
+    {
+      "test_id": "test_f17_f21_apps_settings.TestF19LiveHardwareControl.test_f19_04_read_ldr_sensor",
+      "status": "PASS",
+      "duration": 7.867813110351562e-06,
+      "error": null
+    },
+    {
+      "test_id": "test_f17_f21_apps_settings.TestF19LiveHardwareControl.test_f19_05_piezo_buzzer_tone",
+      "status": "PASS",
+      "duration": 8.344650268554688e-06,
+      "error": null
+    },
+    {
+      "test_id": "test_f17_f21_apps_settings.TestF20NVSPersistence.test_f20_01_default_config_values",
+      "status": "PASS",
+      "duration": 2.0742416381835938e-05,
+      "error": null
+    },
+    {
+      "test_id": "test_f17_f21_apps_settings.TestF20NVSPersistence.test_f20_02_save_and_reload_config",
+      "status": "PASS",
+      "duration": 1.5020370483398438e-05,
+      "error": null
+    },
+    {
+      "test_id": "test_f17_f21_apps_settings.TestF20NVSPersistence.test_f20_03_namespace_is_cyd_os",
+      "status": "PASS",
+      "duration": 7.152557373046875e-06,
+      "error": null
+    },
+    {
+      "test_id": "test_f17_f21_apps_settings.TestF20NVSPersistence.test_f20_04_brightness_clamping_on_save",
+      "status": "PASS",
+      "duration": 1.1205673217773438e-05,
+      "error": null
+    },
+    {
+      "test_id": "test_f17_f21_apps_settings.TestF20NVSPersistence.test_f20_05_sleep_timeout_bounds",
+      "status": "PASS",
+      "duration": 7.62939453125e-06,
+      "error": null
+    },
+    {
+      "test_id": "test_f17_f21_apps_settings.TestF21AboutSystemPage.test_f21_01_about_app_name",
+      "status": "PASS",
+      "duration": 0.0009047985076904297,
+      "error": null
+    },
+    {
+      "test_id": "test_f17_f21_apps_settings.TestF21AboutSystemPage.test_f21_02_about_renders_os_version",
+      "status": "PASS",
+      "duration": 0.001714944839477539,
+      "error": null
+    },
+    {
+      "test_id": "test_f17_f21_apps_settings.TestF21AboutSystemPage.test_f21_03_about_renders_cpu_specs",
+      "status": "PASS",
+      "duration": 0.0017147064208984375,
+      "error": null
+    },
+    {
+      "test_id": "test_f17_f21_apps_settings.TestF21AboutSystemPage.test_f21_04_about_renders_memory_specs",
+      "status": "PASS",
+      "duration": 0.001766204833984375,
+      "error": null
+    },
+    {
+      "test_id": "test_f17_f21_apps_settings.TestF21AboutSystemPage.test_f21_05_about_background_fill",
+      "status": "PASS",
+      "duration": 0.0019309520721435547,
+      "error": null
+    },
+    {
+      "test_id": "test_f22_f24_hal_build.TestF22HardwareHAL.test_f22_01_display_hal_init",
+      "status": "PASS",
+      "duration": 0.0021283626556396484,
+      "error": null
+    },
+    {
+      "test_id": "test_f22_f24_hal_build.TestF22HardwareHAL.test_f22_02_touch_hal_dedicated_spi_coordinates",
+      "status": "PASS",
+      "duration": 0.0009217262268066406,
+      "error": null
+    },
+    {
+      "test_id": "test_f22_f24_hal_build.TestF22HardwareHAL.test_f22_03_touch_hal_screen_to_raw_roundtrip",
+      "status": "PASS",
+      "duration": 0.000919342041015625,
+      "error": null
+    },
+    {
+      "test_id": "test_f22_f24_hal_build.TestF22HardwareHAL.test_f22_04_rgb_led_pins_active_low_inversion",
+      "status": "PASS",
+      "duration": 0.0010423660278320312,
+      "error": null
+    },
+    {
+      "test_id": "test_f22_f24_hal_build.TestF22HardwareHAL.test_f22_05_ldr_adc_photoresistor_reading",
+      "status": "PASS",
+      "duration": 0.001232147216796875,
+      "error": null
+    },
+    {
+      "test_id": "test_f22_f24_hal_build.TestF23StorageHAL.test_f23_01_littlefs_auto_mount",
+      "status": "PASS",
+      "duration": 2.0742416381835938e-05,
+      "error": null
+    },
+    {
+      "test_id": "test_f22_f24_hal_build.TestF23StorageHAL.test_f23_02_default_apps_auto_provisioned",
+      "status": "PASS",
+      "duration": 1.0251998901367188e-05,
+      "error": null
+    },
+    {
+      "test_id": "test_f22_f24_hal_build.TestF23StorageHAL.test_f23_03_sd_card_detection",
+      "status": "PASS",
+      "duration": 9.059906005859375e-06,
+      "error": null
+    },
+    {
+      "test_id": "test_f22_f24_hal_build.TestF23StorageHAL.test_f23_04_storage_capacity_reporting",
+      "status": "PASS",
+      "duration": 1.6450881958007812e-05,
+      "error": null
+    },
+    {
+      "test_id": "test_f22_f24_hal_build.TestF23StorageHAL.test_f23_05_file_write_and_read",
+      "status": "PASS",
+      "duration": 1.1444091796875e-05,
+      "error": null
+    },
+    {
+      "test_id": "test_f22_f24_hal_build.TestF24MultiTargetBuild.test_f24_01_platformio_ini_exists",
+      "status": "PASS",
+      "duration": 0.0004417896270751953,
+      "error": null
+    },
+    {
+      "test_id": "test_f22_f24_hal_build.TestF24MultiTargetBuild.test_f24_02_all_three_targets_defined",
+      "status": "PASS",
+      "duration": 0.00013113021850585938,
+      "error": null
+    },
+    {
+      "test_id": "test_f22_f24_hal_build.TestF24MultiTargetBuild.test_f24_03_default_env_is_cyd2usb",
+      "status": "PASS",
+      "duration": 0.00011658668518066406,
+      "error": null
+    },
+    {
+      "test_id": "test_f22_f24_hal_build.TestF24MultiTargetBuild.test_f24_04_hardware_pin_declarations",
+      "status": "PASS",
+      "duration": 0.00011539459228515625,
+      "error": null
+    },
+    {
+      "test_id": "test_f22_f24_hal_build.TestF24MultiTargetBuild.test_f24_05_platformio_build_clean",
+      "status": "PASS",
+      "duration": 31.502885341644287,
+      "error": null
+    },
+    {
+      "test_id": "test_b01_b06_shell_bounds.TestB01BootSplashBounds.test_b01_01_negative_coordinate_rendering",
+      "status": "PASS",
+      "duration": 0.0014157295227050781,
+      "error": null
+    },
+    {
+      "test_id": "test_b01_b06_shell_bounds.TestB01BootSplashBounds.test_b01_02_portrait_rotation_boundary",
+      "status": "PASS",
+      "duration": 0.0008752346038818359,
+      "error": null
+    },
+    {
+      "test_id": "test_b01_b06_shell_bounds.TestB01BootSplashBounds.test_b01_03_repeated_render_calls",
+      "status": "PASS",
+      "duration": 0.011292457580566406,
+      "error": null
+    },
+    {
+      "test_id": "test_b01_b06_shell_bounds.TestB01BootSplashBounds.test_b01_04_zero_display_pixel_bounds",
+      "status": "PASS",
+      "duration": 0.0011172294616699219,
+      "error": null
+    },
+    {
+      "test_id": "test_b01_b06_shell_bounds.TestB01BootSplashBounds.test_b01_05_out_of_bounds_pixel_bounds",
+      "status": "PASS",
+      "duration": 0.0012087821960449219,
+      "error": null
+    },
+    {
+      "test_id": "test_b01_b06_shell_bounds.TestB02BootProgressBounds.test_b02_01_negative_progress_clamped_to_zero",
+      "status": "PASS",
+      "duration": 0.002834320068359375,
+      "error": null
+    },
+    {
+      "test_id": "test_b01_b06_shell_bounds.TestB02BootProgressBounds.test_b02_02_excessive_progress_clamped_to_100",
+      "status": "PASS",
+      "duration": 0.0019314289093017578,
+      "error": null
+    },
+    {
+      "test_id": "test_b01_b06_shell_bounds.TestB02BootProgressBounds.test_b02_03_empty_status_string",
+      "status": "PASS",
+      "duration": 0.0019698143005371094,
+      "error": null
+    },
+    {
+      "test_id": "test_b01_b06_shell_bounds.TestB02BootProgressBounds.test_b02_04_rapid_100_step_updates",
+      "status": "PASS",
+      "duration": 0.10284709930419922,
+      "error": null
+    },
+    {
+      "test_id": "test_b01_b06_shell_bounds.TestB02BootProgressBounds.test_b02_05_jump_from_zero_to_100",
+      "status": "PASS",
+      "duration": 0.003003835678100586,
+      "error": null
+    },
+    {
+      "test_id": "test_b01_b06_shell_bounds.TestB03BootTransitionBounds.test_b03_01_transition_when_already_in_launcher",
+      "status": "PASS",
+      "duration": 0.0049936771392822266,
+      "error": null
+    },
+    {
+      "test_id": "test_b01_b06_shell_bounds.TestB03BootTransitionBounds.test_b03_02_transition_with_zero_apps_registered",
+      "status": "PASS",
+      "duration": 0.0029273033142089844,
+      "error": null
+    },
+    {
+      "test_id": "test_b01_b06_shell_bounds.TestB03BootTransitionBounds.test_b03_03_touch_during_boot_ignored",
+      "status": "PASS",
+      "duration": 0.0019190311431884766,
+      "error": null
+    },
+    {
+      "test_id": "test_b01_b06_shell_bounds.TestB03BootTransitionBounds.test_b03_04_rapid_boot_to_home_switch",
+      "status": "PASS",
+      "duration": 0.003922700881958008,
+      "error": null
+    },
+    {
+      "test_id": "test_b01_b06_shell_bounds.TestB03BootTransitionBounds.test_b03_05_viewport_clear_boundary",
+      "status": "PASS",
+      "duration": 0.0039038658142089844,
+      "error": null
+    },
+    {
+      "test_id": "test_b01_b06_shell_bounds.TestB04StatusBarBounds.test_b04_01_clock_wrap_around_midnight",
+      "status": "PASS",
+      "duration": 0.0011646747589111328,
+      "error": null
+    },
+    {
+      "test_id": "test_b01_b06_shell_bounds.TestB04StatusBarBounds.test_b04_02_zero_heap_memory_value",
+      "status": "PASS",
+      "duration": 0.0010216236114501953,
+      "error": null
+    },
+    {
+      "test_id": "test_b01_b06_shell_bounds.TestB04StatusBarBounds.test_b04_03_extreme_high_heap_value",
+      "status": "PASS",
+      "duration": 0.001041412353515625,
+      "error": null
+    },
+    {
+      "test_id": "test_b01_b06_shell_bounds.TestB04StatusBarBounds.test_b04_04_sd_indicator_flapping",
+      "status": "PASS",
+      "duration": 0.0013189315795898438,
+      "error": null
+    },
+    {
+      "test_id": "test_b01_b06_shell_bounds.TestB04StatusBarBounds.test_b04_05_status_bar_strictly_confined_to_20px",
+      "status": "PASS",
+      "duration": 0.0010657310485839844,
+      "error": null
+    },
+    {
+      "test_id": "test_b01_b06_shell_bounds.TestB05HomeLauncherBounds.test_b05_01_empty_launcher_render",
+      "status": "PASS",
+      "duration": 0.0017445087432861328,
+      "error": null
+    },
+    {
+      "test_id": "test_b01_b06_shell_bounds.TestB05HomeLauncherBounds.test_b05_02_touch_on_boundary_line_between_slots",
+      "status": "PASS",
+      "duration": 0.0018303394317626953,
+      "error": null
+    },
+    {
+      "test_id": "test_b01_b06_shell_bounds.TestB05HomeLauncherBounds.test_b05_03_touch_off_screen_coordinates",
+      "status": "PASS",
+      "duration": 0.001062154769897461,
+      "error": null
+    },
+    {
+      "test_id": "test_b01_b06_shell_bounds.TestB05HomeLauncherBounds.test_b05_04_more_than_eight_apps_clamped",
+      "status": "PASS",
+      "duration": 0.0022275447845458984,
+      "error": null
+    },
+    {
+      "test_id": "test_b01_b06_shell_bounds.TestB05HomeLauncherBounds.test_b05_05_touch_unpopulated_slot",
+      "status": "PASS",
+      "duration": 0.0010225772857666016,
+      "error": null
+    },
+    {
+      "test_id": "test_b01_b06_shell_bounds.TestB06NavBarBounds.test_b06_01_touch_exactly_at_navbar_top_edge",
+      "status": "PASS",
+      "duration": 0.0010859966278076172,
+      "error": null
+    },
+    {
+      "test_id": "test_b01_b06_shell_bounds.TestB06NavBarBounds.test_b06_02_touch_one_pixel_above_navbar",
+      "status": "PASS",
+      "duration": 0.0010192394256591797,
+      "error": null
+    },
+    {
+      "test_id": "test_b01_b06_shell_bounds.TestB06NavBarBounds.test_b06_03_boundary_between_back_and_home",
+      "status": "PASS",
+      "duration": 0.0010902881622314453,
+      "error": null
+    },
+    {
+      "test_id": "test_b01_b06_shell_bounds.TestB06NavBarBounds.test_b06_04_boundary_between_home_and_tasks",
+      "status": "PASS",
+      "duration": 0.000873565673828125,
+      "error": null
+    },
+    {
+      "test_id": "test_b01_b06_shell_bounds.TestB06NavBarBounds.test_b06_05_corner_pixels_navbar",
+      "status": "PASS",
+      "duration": 0.0008883476257324219,
+      "error": null
+    },
+    {
+      "test_id": "test_b07_b10_framework_bounds.TestB07AppFrameworkBounds.test_b07_01_double_on_create_call",
+      "status": "PASS",
+      "duration": 2.002716064453125e-05,
+      "error": null
+    },
+    {
+      "test_id": "test_b07_b10_framework_bounds.TestB07AppFrameworkBounds.test_b07_02_double_on_destroy_call",
+      "status": "PASS",
+      "duration": 9.5367431640625e-06,
+      "error": null
+    },
+    {
+      "test_id": "test_b07_b10_framework_bounds.TestB07AppFrameworkBounds.test_b07_03_pause_without_resume",
+      "status": "PASS",
+      "duration": 7.3909759521484375e-06,
+      "error": null
+    },
+    {
+      "test_id": "test_b07_b10_framework_bounds.TestB07AppFrameworkBounds.test_b07_04_touch_event_negative_coordinates",
+      "status": "PASS",
+      "duration": 1.0251998901367188e-05,
+      "error": null
+    },
+    {
+      "test_id": "test_b07_b10_framework_bounds.TestB07AppFrameworkBounds.test_b07_05_empty_app_name_and_icon",
+      "status": "PASS",
+      "duration": 7.3909759521484375e-06,
+      "error": null
+    },
+    {
+      "test_id": "test_b07_b10_framework_bounds.TestB08DynamicDiscoveryBounds.test_b08_01_empty_apps_directory",
+      "status": "PASS",
+      "duration": 1.7404556274414062e-05,
+      "error": null
+    },
+    {
+      "test_id": "test_b07_b10_framework_bounds.TestB08DynamicDiscoveryBounds.test_b08_02_zero_byte_script_file_discovery",
+      "status": "PASS",
+      "duration": 2.288818359375e-05,
+      "error": null
+    },
+    {
+      "test_id": "test_b07_b10_framework_bounds.TestB08DynamicDiscoveryBounds.test_b08_03_special_characters_in_filename",
+      "status": "PASS",
+      "duration": 1.1205673217773438e-05,
+      "error": null
+    },
+    {
+      "test_id": "test_b07_b10_framework_bounds.TestB08DynamicDiscoveryBounds.test_b08_04_deep_nested_paths_ignored",
+      "status": "PASS",
+      "duration": 9.298324584960938e-06,
+      "error": null
+    },
+    {
+      "test_id": "test_b07_b10_framework_bounds.TestB08DynamicDiscoveryBounds.test_b08_05_sd_card_toggled_during_scan",
+      "status": "PASS",
+      "duration": 7.62939453125e-06,
+      "error": null
+    },
+    {
+      "test_id": "test_b07_b10_framework_bounds.TestB09DynamicAppLaunchBounds.test_b09_01_negative_index_rejected",
+      "status": "PASS",
+      "duration": 1.1205673217773438e-05,
+      "error": null
+    },
+    {
+      "test_id": "test_b07_b10_framework_bounds.TestB09DynamicAppLaunchBounds.test_b09_02_large_index_rejected",
+      "status": "PASS",
+      "duration": 6.9141387939453125e-06,
+      "error": null
+    },
+    {
+      "test_id": "test_b07_b10_framework_bounds.TestB09DynamicAppLaunchBounds.test_b09_03_launch_already_active_app",
+      "status": "PASS",
+      "duration": 8.344650268554688e-06,
+      "error": null
+    },
+    {
+      "test_id": "test_b07_b10_framework_bounds.TestB09DynamicAppLaunchBounds.test_b09_04_rapid_launch_toggling",
+      "status": "PASS",
+      "duration": 1.4066696166992188e-05,
+      "error": null
+    },
+    {
+      "test_id": "test_b07_b10_framework_bounds.TestB09DynamicAppLaunchBounds.test_b09_05_launch_with_empty_registry",
+      "status": "PASS",
+      "duration": 6.67572021484375e-06,
+      "error": null
+    },
+    {
+      "test_id": "test_b07_b10_framework_bounds.TestB10DynamicAppExitBounds.test_b10_01_exit_when_no_app_active",
+      "status": "PASS",
+      "duration": 8.344650268554688e-06,
+      "error": null
+    },
+    {
+      "test_id": "test_b07_b10_framework_bounds.TestB10DynamicAppExitBounds.test_b10_02_double_exit_call",
+      "status": "PASS",
+      "duration": 6.9141387939453125e-06,
+      "error": null
+    },
+    {
+      "test_id": "test_b07_b10_framework_bounds.TestB10DynamicAppExitBounds.test_b10_03_state_after_exit_is_paused",
+      "status": "PASS",
+      "duration": 7.152557373046875e-06,
+      "error": null
+    },
+    {
+      "test_id": "test_b07_b10_framework_bounds.TestB10DynamicAppExitBounds.test_b10_04_relaunch_after_exit",
+      "status": "PASS",
+      "duration": 6.9141387939453125e-06,
+      "error": null
+    },
+    {
+      "test_id": "test_b07_b10_framework_bounds.TestB10DynamicAppExitBounds.test_b10_05_exit_all_lifecycle_log",
+      "status": "PASS",
+      "duration": 9.298324584960938e-06,
+      "error": null
+    },
+    {
+      "test_id": "test_b11_b16_scripting_bounds.TestB11ScriptEngineBounds.test_b11_01_empty_script_string",
+      "status": "PASS",
+      "duration": 0.0008890628814697266,
+      "error": null
+    },
+    {
+      "test_id": "test_b11_b16_scripting_bounds.TestB11ScriptEngineBounds.test_b11_02_whitespace_only_script",
+      "status": "PASS",
+      "duration": 0.0008955001831054688,
+      "error": null
+    },
+    {
+      "test_id": "test_b11_b16_scripting_bounds.TestB11ScriptEngineBounds.test_b11_03_massive_script_execution",
+      "status": "PASS",
+      "duration": 0.49875617027282715,
+      "error": null
+    },
+    {
+      "test_id": "test_b11_b16_scripting_bounds.TestB11ScriptEngineBounds.test_b11_04_execution_after_prior_error",
+      "status": "PASS",
+      "duration": 0.002221822738647461,
+      "error": null
+    },
+    {
+      "test_id": "test_b11_b16_scripting_bounds.TestB11ScriptEngineBounds.test_b11_05_double_init_clears_hook_count",
+      "status": "PASS",
+      "duration": 0.0010988712310791016,
+      "error": null
+    },
+    {
+      "test_id": "test_b11_b16_scripting_bounds.TestB12ScriptFileBounds.test_b12_01_execute_zero_byte_file",
+      "status": "PASS",
+      "duration": 0.0011515617370605469,
+      "error": null
+    },
+    {
+      "test_id": "test_b11_b16_scripting_bounds.TestB12ScriptFileBounds.test_b12_02_execute_file_with_spaces_in_path",
+      "status": "PASS",
+      "duration": 0.0020904541015625,
+      "error": null
+    },
+    {
+      "test_id": "test_b11_b16_scripting_bounds.TestB12ScriptFileBounds.test_b12_03_execute_unmounted_sd_file",
+      "status": "PASS",
+      "duration": 0.001131296157836914,
+      "error": null
+    },
+    {
+      "test_id": "test_b11_b16_scripting_bounds.TestB12ScriptFileBounds.test_b12_04_execute_deleted_file",
+      "status": "PASS",
+      "duration": 0.0010492801666259766,
+      "error": null
+    },
+    {
+      "test_id": "test_b11_b16_scripting_bounds.TestB12ScriptFileBounds.test_b12_05_directory_path_instead_of_file",
+      "status": "PASS",
+      "duration": 0.0011110305786132812,
+      "error": null
+    },
+    {
+      "test_id": "test_b11_b16_scripting_bounds.TestB13GUIScriptBindingsBounds.test_b13_01_draw_rect_completely_offscreen",
+      "status": "PASS",
+      "duration": 0.0012142658233642578,
+      "error": null
+    },
+    {
+      "test_id": "test_b11_b16_scripting_bounds.TestB13GUIScriptBindingsBounds.test_b13_02_draw_rect_zero_dimensions",
+      "status": "PASS",
+      "duration": 0.001041412353515625,
+      "error": null
+    },
+    {
+      "test_id": "test_b11_b16_scripting_bounds.TestB13GUIScriptBindingsBounds.test_b13_03_draw_text_empty_string",
+      "status": "PASS",
+      "duration": 0.0010116100311279297,
+      "error": null
+    },
+    {
+      "test_id": "test_b11_b16_scripting_bounds.TestB13GUIScriptBindingsBounds.test_b13_04_extreme_colors",
+      "status": "PASS",
+      "duration": 0.0030014514923095703,
+      "error": null
+    },
+    {
+      "test_id": "test_b11_b16_scripting_bounds.TestB13GUIScriptBindingsBounds.test_b13_05_draw_text_at_boundary_margins",
+      "status": "PASS",
+      "duration": 0.0010683536529541016,
+      "error": null
+    },
+    {
+      "test_id": "test_b11_b16_scripting_bounds.TestB14SysBindingsBounds.test_b14_01_backlight_clamping_negative",
+      "status": "PASS",
+      "duration": 0.0009531974792480469,
+      "error": null
+    },
+    {
+      "test_id": "test_b11_b16_scripting_bounds.TestB14SysBindingsBounds.test_b14_02_backlight_clamping_excessive",
+      "status": "PASS",
+      "duration": 0.0009331703186035156,
+      "error": null
+    },
+    {
+      "test_id": "test_b11_b16_scripting_bounds.TestB14SysBindingsBounds.test_b14_03_led_clamping_positive_values",
+      "status": "PASS",
+      "duration": 0.0010569095611572266,
+      "error": null
+    },
+    {
+      "test_id": "test_b11_b16_scripting_bounds.TestB14SysBindingsBounds.test_b14_04_touch_query_when_unpressed",
+      "status": "PASS",
+      "duration": 0.0010755062103271484,
+      "error": null
+    },
+    {
+      "test_id": "test_b11_b16_scripting_bounds.TestB14SysBindingsBounds.test_b14_05_tone_zero_duration",
+      "status": "PASS",
+      "duration": 0.0010454654693603516,
+      "error": null
+    },
+    {
+      "test_id": "test_b11_b16_scripting_bounds.TestB15ScriptSandboxWDTBounds.test_b15_01_instruction_cap_trigger",
+      "status": "PASS",
+      "duration": 0.00982522964477539,
+      "error": null
+    },
+    {
+      "test_id": "test_b11_b16_scripting_bounds.TestB15ScriptSandboxWDTBounds.test_b15_02_abort_flag_before_script",
+      "status": "PASS",
+      "duration": 0.0009963512420654297,
+      "error": null
+    },
+    {
+      "test_id": "test_b11_b16_scripting_bounds.TestB15ScriptSandboxWDTBounds.test_b15_03_wdt_feed_boundary_at_999_and_1000",
+      "status": "PASS",
+      "duration": 0.0010263919830322266,
+      "error": null
+    },
+    {
+      "test_id": "test_b11_b16_scripting_bounds.TestB15ScriptSandboxWDTBounds.test_b15_04_wdt_feed_at_exact_multiples",
+      "status": "PASS",
+      "duration": 0.001093149185180664,
+      "error": null
+    },
+    {
+      "test_id": "test_b11_b16_scripting_bounds.TestB15ScriptSandboxWDTBounds.test_b15_05_engine_not_running_after_timeout",
+      "status": "PASS",
+      "duration": 0.004944324493408203,
+      "error": null
+    },
+    {
+      "test_id": "test_b11_b16_scripting_bounds.TestB16ZeroCrashErrorTrappingBounds.test_b16_01_long_error_string_truncation",
+      "status": "PASS",
+      "duration": 0.0016133785247802734,
+      "error": null
+    },
+    {
+      "test_id": "test_b11_b16_scripting_bounds.TestB16ZeroCrashErrorTrappingBounds.test_b16_02_dismiss_touch_boundary_edges",
+      "status": "PASS",
+      "duration": 0.0036008358001708984,
+      "error": null
+    },
+    {
+      "test_id": "test_b11_b16_scripting_bounds.TestB16ZeroCrashErrorTrappingBounds.test_b16_03_touch_outside_dismiss_button_in_modal",
+      "status": "PASS",
+      "duration": 0.0014691352844238281,
+      "error": null
+    },
+    {
+      "test_id": "test_b11_b16_scripting_bounds.TestB16ZeroCrashErrorTrappingBounds.test_b16_04_nav_bar_back_dismisses_modal",
+      "status": "PASS",
+      "duration": 0.0036203861236572266,
+      "error": null
+    },
+    {
+      "test_id": "test_b11_b16_scripting_bounds.TestB16ZeroCrashErrorTrappingBounds.test_b16_05_modal_rendered_dialog_box_dimensions",
+      "status": "PASS",
+      "duration": 0.0014522075653076172,
+      "error": null
+    },
+    {
+      "test_id": "test_b17_b21_apps_settings_bounds.TestB17BundledAppsBounds.test_b17_01_corrupt_bundled_app_recovery",
+      "status": "PASS",
+      "duration": 0.0010859966278076172,
+      "error": null
+    },
+    {
+      "test_id": "test_b17_b21_apps_settings_bounds.TestB17BundledAppsBounds.test_b17_02_su7_model_vertex_count",
+      "status": "PASS",
+      "duration": 0.0020453929901123047,
+      "error": null
+    },
+    {
+      "test_id": "test_b17_b21_apps_settings_bounds.TestB17BundledAppsBounds.test_b17_03_paint_app_touch_clamping",
+      "status": "PASS",
+      "duration": 0.0009148120880126953,
+      "error": null
+    },
+    {
+      "test_id": "test_b17_b21_apps_settings_bounds.TestB17BundledAppsBounds.test_b17_04_sysinfo_heap_metrics",
+      "status": "PASS",
+      "duration": 0.0010983943939208984,
+      "error": null
+    },
+    {
+      "test_id": "test_b17_b21_apps_settings_bounds.TestB17BundledAppsBounds.test_b17_05_calc_button_hitboxes",
+      "status": "PASS",
+      "duration": 0.0010957717895507812,
+      "error": null
+    },
+    {
+      "test_id": "test_b17_b21_apps_settings_bounds.TestB18SettingsUIBounds.test_b18_01_brightness_minimum_10_percent",
+      "status": "PASS",
+      "duration": 0.0011303424835205078,
+      "error": null
+    },
+    {
+      "test_id": "test_b17_b21_apps_settings_bounds.TestB18SettingsUIBounds.test_b18_02_brightness_maximum_100_percent",
+      "status": "PASS",
+      "duration": 0.0009362697601318359,
+      "error": null
+    },
+    {
+      "test_id": "test_b17_b21_apps_settings_bounds.TestB18SettingsUIBounds.test_b18_03_sleep_timeout_zero_disabled",
+      "status": "PASS",
+      "duration": 0.0009579658508300781,
+      "error": null
+    },
+    {
+      "test_id": "test_b17_b21_apps_settings_bounds.TestB18SettingsUIBounds.test_b18_04_theme_binary_values",
+      "status": "PASS",
+      "duration": 0.0009496212005615234,
+      "error": null
+    },
+    {
+      "test_id": "test_b17_b21_apps_settings_bounds.TestB18SettingsUIBounds.test_b18_05_sound_toggle_boolean",
+      "status": "PASS",
+      "duration": 0.0009872913360595703,
+      "error": null
+    },
+    {
+      "test_id": "test_b17_b21_apps_settings_bounds.TestB19HardwareControlBounds.test_b19_01_pwm_duty_zero_percent",
+      "status": "PASS",
+      "duration": 1.621246337890625e-05,
+      "error": null
+    },
+    {
+      "test_id": "test_b17_b21_apps_settings_bounds.TestB19HardwareControlBounds.test_b19_02_pwm_duty_100_percent",
+      "status": "PASS",
+      "duration": 8.821487426757812e-06,
+      "error": null
+    },
+    {
+      "test_id": "test_b17_b21_apps_settings_bounds.TestB19HardwareControlBounds.test_b19_03_rapid_rgb_led_toggling",
+      "status": "PASS",
+      "duration": 1.9550323486328125e-05,
+      "error": null
+    },
+    {
+      "test_id": "test_b17_b21_apps_settings_bounds.TestB19HardwareControlBounds.test_b19_04_ldr_sensor_extreme_adc_values",
+      "status": "PASS",
+      "duration": 8.344650268554688e-06,
+      "error": null
+    },
+    {
+      "test_id": "test_b17_b21_apps_settings_bounds.TestB19HardwareControlBounds.test_b19_05_high_frequency_tone_generation",
+      "status": "PASS",
+      "duration": 6.67572021484375e-06,
+      "error": null
+    },
+    {
+      "test_id": "test_b17_b21_apps_settings_bounds.TestB20NVSPersistenceBounds.test_b20_01_corrupted_non_numeric_brightness",
+      "status": "PASS",
+      "duration": 1.7881393432617188e-05,
+      "error": null
+    },
+    {
+      "test_id": "test_b17_b21_apps_settings_bounds.TestB20NVSPersistenceBounds.test_b20_02_corrupted_timeout_fallback",
+      "status": "PASS",
+      "duration": 8.344650268554688e-06,
+      "error": null
+    },
+    {
+      "test_id": "test_b17_b21_apps_settings_bounds.TestB20NVSPersistenceBounds.test_b20_03_missing_keys_handled",
+      "status": "PASS",
+      "duration": 8.344650268554688e-06,
+      "error": null
+    },
+    {
+      "test_id": "test_b17_b21_apps_settings_bounds.TestB20NVSPersistenceBounds.test_b20_04_reset_to_defaults_clears_modifications",
+      "status": "PASS",
+      "duration": 8.344650268554688e-06,
+      "error": null
+    },
+    {
+      "test_id": "test_b17_b21_apps_settings_bounds.TestB20NVSPersistenceBounds.test_b20_05_extreme_sleep_timeout_clamped",
+      "status": "PASS",
+      "duration": 7.3909759521484375e-06,
+      "error": null
+    },
+    {
+      "test_id": "test_b17_b21_apps_settings_bounds.TestB21AboutSystemPageBounds.test_b21_01_about_renders_inside_viewport",
+      "status": "PASS",
+      "duration": 0.00193023681640625,
+      "error": null
+    },
+    {
+      "test_id": "test_b17_b21_apps_settings_bounds.TestB21AboutSystemPageBounds.test_b21_02_repeated_about_renders_memory_stable",
+      "status": "PASS",
+      "duration": 0.009339332580566406,
+      "error": null
+    },
+    {
+      "test_id": "test_b17_b21_apps_settings_bounds.TestB21AboutSystemPageBounds.test_b21_03_zero_uptime_display",
+      "status": "PASS",
+      "duration": 0.0018260478973388672,
+      "error": null
+    },
+    {
+      "test_id": "test_b17_b21_apps_settings_bounds.TestB21AboutSystemPageBounds.test_b21_04_about_viewport_width_respected",
+      "status": "PASS",
+      "duration": 0.0017328262329101562,
+      "error": null
+    },
+    {
+      "test_id": "test_b17_b21_apps_settings_bounds.TestB21AboutSystemPageBounds.test_b21_05_about_unhandled_touch_ignored",
+      "status": "PASS",
+      "duration": 0.0009152889251708984,
+      "error": null
+    },
+    {
+      "test_id": "test_b22_b24_hal_build_bounds.TestB22HardwareHALBounds.test_b22_01_touch_adc_clamping_below_min",
+      "status": "PASS",
+      "duration": 0.0009875297546386719,
+      "error": null
+    },
+    {
+      "test_id": "test_b22_b24_hal_build_bounds.TestB22HardwareHALBounds.test_b22_02_touch_adc_clamping_above_max",
+      "status": "PASS",
+      "duration": 0.0009636878967285156,
+      "error": null
+    },
+    {
+      "test_id": "test_b22_b24_hal_build_bounds.TestB22HardwareHALBounds.test_b22_03_custom_touch_calibration",
+      "status": "PASS",
+      "duration": 0.0009098052978515625,
+      "error": null
+    },
+    {
+      "test_id": "test_b22_b24_hal_build_bounds.TestB22HardwareHALBounds.test_b22_04_touch_pressure_threshold",
+      "status": "PASS",
+      "duration": 0.0009305477142333984,
+      "error": null
+    },
+    {
+      "test_id": "test_b22_b24_hal_build_bounds.TestB22HardwareHALBounds.test_b22_05_display_driver_and_inversion",
+      "status": "PASS",
+      "duration": 0.0010421276092529297,
+      "error": null
+    },
+    {
+      "test_id": "test_b22_b24_hal_build_bounds.TestB23StorageHALBounds.test_b23_01_storage_full_write_fails",
+      "status": "PASS",
+      "duration": 3.361701965332031e-05,
+      "error": null
+    },
+    {
+      "test_id": "test_b22_b24_hal_build_bounds.TestB23StorageHALBounds.test_b23_02_write_exactly_at_capacity",
+      "status": "PASS",
+      "duration": 1.5497207641601562e-05,
+      "error": null
+    },
+    {
+      "test_id": "test_b22_b24_hal_build_bounds.TestB23StorageHALBounds.test_b23_03_delete_non_existent_file_returns_false",
+      "status": "PASS",
+      "duration": 8.106231689453125e-06,
+      "error": null
+    },
+    {
+      "test_id": "test_b22_b24_hal_build_bounds.TestB23StorageHALBounds.test_b23_04_sd_write_when_unmounted_fails",
+      "status": "PASS",
+      "duration": 7.867813110351562e-06,
+      "error": null
+    },
+    {
+      "test_id": "test_b22_b24_hal_build_bounds.TestB23StorageHALBounds.test_b23_05_idempotent_provisioning",
+      "status": "PASS",
+      "duration": 1.621246337890625e-05,
+      "error": null
+    },
+    {
+      "test_id": "test_b22_b24_hal_build_bounds.TestB24MultiTargetBuildBounds.test_b24_01_spi_frequency_configuration",
+      "status": "PASS",
+      "duration": 0.0005757808685302734,
+      "error": null
+    },
+    {
+      "test_id": "test_b22_b24_hal_build_bounds.TestB24MultiTargetBuildBounds.test_b24_02_tft_driver_flags_per_target",
+      "status": "PASS",
+      "duration": 0.00014472007751464844,
+      "error": null
+    },
+    {
+      "test_id": "test_b22_b24_hal_build_bounds.TestB24MultiTargetBuildBounds.test_b24_03_font_loading_flags",
+      "status": "PASS",
+      "duration": 0.00012183189392089844,
+      "error": null
+    },
+    {
+      "test_id": "test_b22_b24_hal_build_bounds.TestB24MultiTargetBuildBounds.test_b24_04_framework_arduino_specified",
+      "status": "PASS",
+      "duration": 0.000118255615234375,
+      "error": null
+    },
+    {
+      "test_id": "test_b22_b24_hal_build_bounds.TestB24MultiTargetBuildBounds.test_b24_05_baud_rate_and_monitor_filters",
+      "status": "PASS",
+      "duration": 0.00011754035949707031,
+      "error": null
+    },
+    {
+      "test_id": "test_interactions.TestTier3Interactions.test_ci01_script_execution_while_touch_active",
+      "status": "PASS",
+      "duration": 0.0022275447845458984,
+      "error": null
+    },
+    {
+      "test_id": "test_interactions.TestTier3Interactions.test_ci02_brightness_adjustment_during_app_launch",
+      "status": "PASS",
+      "duration": 0.004231452941894531,
+      "error": null
+    },
+    {
+      "test_id": "test_interactions.TestTier3Interactions.test_ci03_littlefs_full_condition_during_script_write",
+      "status": "PASS",
+      "duration": 0.0009109973907470703,
+      "error": null
+    },
+    {
+      "test_id": "test_interactions.TestTier3Interactions.test_ci04_navbar_home_interrupts_infinite_script_loop",
+      "status": "PASS",
+      "duration": 0.0009052753448486328,
+      "error": null
+    },
+    {
+      "test_id": "test_interactions.TestTier3Interactions.test_ci05_theme_change_reflected_in_launcher_render",
+      "status": "PASS",
+      "duration": 0.0009400844573974609,
+      "error": null
+    },
+    {
+      "test_id": "test_interactions.TestTier3Interactions.test_ci06_auto_provisioning_then_app_discovery",
+      "status": "PASS",
+      "duration": 0.0009801387786865234,
+      "error": null
+    },
+    {
+      "test_id": "test_interactions.TestTier3Interactions.test_ci07_microsd_hotplug_app_registration",
+      "status": "PASS",
+      "duration": 0.0010383129119873047,
+      "error": null
+    },
+    {
+      "test_id": "test_interactions.TestTier3Interactions.test_ci08_microsd_unmount_while_running_sd_app",
+      "status": "PASS",
+      "duration": 0.0009691715240478516,
+      "error": null
+    },
+    {
+      "test_id": "test_interactions.TestTier3Interactions.test_ci09_rapid_app_switching_lifecycle_integrity",
+      "status": "PASS",
+      "duration": 0.0008676052093505859,
+      "error": null
+    },
+    {
+      "test_id": "test_interactions.TestTier3Interactions.test_ci10_nvs_persistence_across_simulated_reboot",
+      "status": "PASS",
+      "duration": 0.0008969306945800781,
+      "error": null
+    },
+    {
+      "test_id": "test_interactions.TestTier3Interactions.test_ci11_modal_error_dialog_dismiss_via_navbar",
+      "status": "PASS",
+      "duration": 0.005686283111572266,
+      "error": null
+    },
+    {
+      "test_id": "test_interactions.TestTier3Interactions.test_ci12_touch_calibration_affects_launcher_hit_testing",
+      "status": "PASS",
+      "duration": 0.00417637825012207,
+      "error": null
+    },
+    {
+      "test_id": "test_interactions.TestTier3Interactions.test_ci13_ldr_sensor_triggers_auto_backlight_adjustment",
+      "status": "PASS",
+      "duration": 0.0008826255798339844,
+      "error": null
+    },
+    {
+      "test_id": "test_interactions.TestTier3Interactions.test_ci14_active_led_pulse_while_audio_tone_plays",
+      "status": "PASS",
+      "duration": 0.001010894775390625,
+      "error": null
+    },
+    {
+      "test_id": "test_interactions.TestTier3Interactions.test_ci15_status_bar_updates_during_active_app_render",
+      "status": "PASS",
+      "duration": 0.005296230316162109,
+      "error": null
+    },
+    {
+      "test_id": "test_interactions.TestTier3Interactions.test_ci16_boot_failsafe_missing_sd_falls_back_to_littlefs",
+      "status": "PASS",
+      "duration": 0.0010111331939697266,
+      "error": null
+    },
+    {
+      "test_id": "test_scenarios.TestTier4RealWorldScenarios.test_scenario_01_cold_boot_to_home",
+      "status": "PASS",
+      "duration": 0.009424209594726562,
+      "error": null
+    },
+    {
+      "test_id": "test_scenarios.TestTier4RealWorldScenarios.test_scenario_02_app_launch_and_nav_back",
+      "status": "PASS",
+      "duration": 0.0065898895263671875,
+      "error": null
+    },
+    {
+      "test_id": "test_scenarios.TestTier4RealWorldScenarios.test_scenario_03_settings_pwm_nvs_persistence_flow",
+      "status": "PASS",
+      "duration": 4.76837158203125e-05,
+      "error": null
+    },
+    {
+      "test_id": "test_scenarios.TestTier4RealWorldScenarios.test_scenario_04_dynamic_calculator_execution_flow",
+      "status": "PASS",
+      "duration": 0.004752635955810547,
+      "error": null
+    },
+    {
+      "test_id": "test_scenarios.TestTier4RealWorldScenarios.test_scenario_05_script_crash_and_modal_recovery_flow",
+      "status": "PASS",
+      "duration": 0.003689289093017578,
+      "error": null
+    },
+    {
+      "test_id": "test_scenarios.TestTier4RealWorldScenarios.test_scenario_06_hardware_telemetry_flow",
+      "status": "PASS",
+      "duration": 0.0071256160736083984,
+      "error": null
+    },
+    {
+      "test_id": "test_scenarios.TestTier4RealWorldScenarios.test_scenario_07_su7_wireframe_3d_lifecycle_flow",
+      "status": "PASS",
+      "duration": 0.010972738265991211,
+      "error": null
+    },
+    {
+      "test_id": "test_scenarios.TestTier4RealWorldScenarios.test_scenario_08_fresh_flash_turnkey_setup_flow",
+      "status": "PASS",
+      "duration": 0.00400090217590332,
+      "error": null
+    }
+  ]
+}

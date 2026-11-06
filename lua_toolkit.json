@@ -1,0 +1,579 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ESP32 CYD Android OS - Lua App Development Toolkit",
+  "version": "1.0.0",
+  "target_hardware": {
+    "device": "ESP32-2432S028 (Cheap Yellow Display / CYD)",
+    "mcu": "ESP32-D0WD-V3 (Dual Core Tensilica LX6 @ 240MHz, 520KB SRAM, 4MB Flash)",
+    "display": {
+      "controller": "ST7789 / ILI9341 compatible",
+      "resolution": {
+        "width": 240,
+        "height": 320
+      },
+      "orientation": "Portrait / Vertical (Rotation 0)",
+      "color_depth": "RGB565 (16-bit)"
+    },
+    "touch": {
+      "controller": "XPT2046 (Resistive)",
+      "bus": "VSPI (or HSPI shared with soft CS)",
+      "filtering": "Hardware HAL provides 3-sample median filter, jitter rejection, and debounce"
+    },
+    "peripherals": {
+      "rgb_led": "Active-LOW RGB pins on board, controlled via sys.setLED(r, g, b)",
+      "buzzer": "Piezo speaker on GPIO 26, controlled via sys.beep(freq, dur)",
+      "ldr": "Light Dependent Resistor on GPIO 34 (ADC1), read via sys.getLdr()",
+      "sd_card": "MicroSD slot on VSPI (CS pin GPIO 5, FAT32 formatted)"
+    }
+  },
+  "runtime_environment": {
+    "engine": "Lua 5.4.6 (ANSI C, 32-bit integer mode)",
+    "heap_budget": "~100KB to 160KB RAM available for Lua VM and scripts",
+    "execution_model": "Synchronous single-threaded UI loop with cooperative multitasking",
+    "os_shell_pumping": "sys.delay(ms) and an instruction count hook (1000 instructions) automatically pump the OS touch router, status bar, and navigation bar",
+    "exit_mechanism": "Pressing the Navigation Bar Back or Home button sets an internal abort flag and throws an abort exception, cleanly returning to the Launcher"
+  },
+  "screen_layout": {
+    "default_orientation": "portrait",
+    "display_width": 240,
+    "display_height": 320,
+    "system_status_bar": {
+      "x": 0,
+      "y": 0,
+      "width": 240,
+      "height": 20,
+      "ownership": "Reserved exclusively for the OS shell (shows time, battery, RAM, SD status)",
+      "rule": "Apps MUST NEVER draw within Y < 20"
+    },
+    "app_viewport": {
+      "x": 0,
+      "y": 20,
+      "width": 240,
+      "height": 274,
+      "min_x": 0,
+      "max_x": 239,
+      "min_y": 20,
+      "max_y": 293,
+      "rule": "ALL portrait application visuals and touch interaction MUST stay strictly within this 240x274 rectangle"
+    },
+    "system_nav_bar": {
+      "x": 0,
+      "y": 294,
+      "width": 240,
+      "height": 26,
+      "touch_active_min_y": 288,
+      "ownership": "Reserved exclusively for OS Navigation (< Back, O Home, [] Tasks)",
+      "rule": "Apps MUST NEVER draw within Y >= 294 and should avoid placing touch buttons below Y = 285"
+    },
+    "landscape_compatibility_mode": {
+      "description": "The OS includes an automatic Landscape Compatibility Layer. If a Lua script declares `-- @orientation: landscape`, calls `sys.setOrientation('landscape')`, or uses legacy `VP_W = 320` / `VP_H = 194` / `320, 194` dimensions, the OS automatically rotates the display, touch digitizer, StatusBar, and NavBar to Landscape (320x240) while the app runs, and restores Portrait (240x320) on exit.",
+      "display_width": 320,
+      "display_height": 240,
+      "status_bar": { "x": 0, "y": 0, "width": 320, "height": 20 },
+      "app_viewport": { "x": 0, "y": 20, "width": 320, "height": 194, "min_x": 0, "max_x": 319, "min_y": 20, "max_y": 213 },
+      "nav_bar": { "x": 0, "y": 214, "width": 320, "height": 26, "touch_active_min_y": 208 }
+    }
+  },
+  "color_palette_rgb565": {
+    "format": "16-bit unsigned integer hex (0x0000 - 0xFFFF)",
+    "conversion_formula": "((R5 << 11) | (G6 << 5) | B5)",
+    "palette": {
+      "black": "0x0000",
+      "white": "0xFFFF",
+      "red": "0xF800",
+      "green": "0x07E0",
+      "blue": "0x001F",
+      "cyan": "0x07FF",
+      "yellow": "0xFFE0",
+      "orange": "0xFD20",
+      "magenta": "0xF81F",
+      "android_dark_bg": "0x0821",
+      "card_surface": "0x18E3",
+      "card_surface_elevated": "0x2124",
+      "border_gray": "0x39E7",
+      "neutral_button": "0x4208",
+      "subtext_gray": "0x8410",
+      "light_gray": "0xC618",
+      "material_accent_cyan": "0x04F5",
+      "material_accent_teal": "0x03E9",
+      "material_accent_purple": "0x780F",
+      "material_accent_amber": "0xFBA0",
+      "material_accent_red": "0xD882"
+    }
+  },
+  "typography": {
+    "font_1": {
+      "id": 1,
+      "char_size": "6x8 pixels",
+      "style": "Fixed-pitch mono",
+      "recommended_use": "Compact data, terminal logs, small labels, hex data"
+    },
+    "font_2": {
+      "id": 2,
+      "char_size": "8x16 pixels",
+      "style": "Default sans-serif proportional font",
+      "recommended_use": "Standard UI buttons, lists, titles, values, dialogs (Default font)"
+    },
+    "font_4": {
+      "id": 4,
+      "char_size": "14x26 pixels",
+      "style": "Large numerals and bold headers",
+      "recommended_use": "Big clock display, calculator readout, prominent counters"
+    }
+  },
+  "api_modules": {
+    "gui": {
+      "description": "Direct fast primitive rendering to the ST7789 display within the app viewport.",
+      "functions": [
+        {
+          "name": "gui.fillRect",
+          "signature": "gui.fillRect(x, y, w, h, color)",
+          "params": [
+            { "name": "x", "type": "integer", "description": "Top-left X coordinate (0-319)" },
+            { "name": "y", "type": "integer", "description": "Top-left Y coordinate (20-213)" },
+            { "name": "w", "type": "integer", "description": "Width in pixels" },
+            { "name": "h", "type": "integer", "description": "Height in pixels" },
+            { "name": "color", "type": "integer", "description": "16-bit RGB565 color hex (e.g. 0x0821)" }
+          ],
+          "returns": "nil",
+          "notes": "Essential for clearing card backgrounds, drawing solid buttons, and double-buffered UI segments."
+        },
+        {
+          "name": "gui.drawRect",
+          "signature": "gui.drawRect(x, y, w, h, color)",
+          "params": [
+            { "name": "x", "type": "integer", "description": "Top-left X coordinate" },
+            { "name": "y", "type": "integer", "description": "Top-left Y coordinate" },
+            { "name": "w", "type": "integer", "description": "Width in pixels" },
+            { "name": "h", "type": "integer", "description": "Height in pixels" },
+            { "name": "color", "type": "integer", "description": "16-bit RGB565 color hex" }
+          ],
+          "returns": "nil",
+          "notes": "Draws a 1px outline box. Useful for cards, button borders, and selection frames."
+        },
+        {
+          "name": "gui.drawText",
+          "signature": "gui.drawText(x, y, text, color [, font])",
+          "params": [
+            { "name": "x", "type": "integer", "description": "Top-left X coordinate of text" },
+            { "name": "y", "type": "integer", "description": "Top-left Y coordinate of text" },
+            { "name": "text", "type": "string|number", "description": "The string to render" },
+            { "name": "color", "type": "integer", "default": "0xFFFF", "description": "16-bit RGB565 text color" },
+            { "name": "font", "type": "integer", "default": 2, "description": "Font ID: 1 (small), 2 (medium/default), or 4 (large digits)" }
+          ],
+          "returns": "nil",
+          "notes": "Renders with transparent background. Clear the background with gui.fillRect before redrawing dynamic text."
+        },
+        {
+          "name": "gui.drawLine",
+          "signature": "gui.drawLine(x1, y1, x2, y2, color)",
+          "params": [
+            { "name": "x1", "type": "integer", "description": "Start X" },
+            { "name": "y1", "type": "integer", "description": "Start Y" },
+            { "name": "x2", "type": "integer", "description": "End X" },
+            { "name": "y2", "type": "integer", "description": "End Y" },
+            { "name": "color", "type": "integer", "description": "16-bit RGB565 color" }
+          ],
+          "returns": "nil",
+          "notes": "Draws an arbitrary 1-pixel line (Bresenham's algorithm)."
+        },
+        {
+          "name": "gui.drawFastHLine",
+          "signature": "gui.drawFastHLine(x, y, w, color)",
+          "params": [
+            { "name": "x", "type": "integer", "description": "Start X" },
+            { "name": "y", "type": "integer", "description": "Y coordinate" },
+            { "name": "w", "type": "integer", "description": "Width in pixels" },
+            { "name": "color", "type": "integer", "description": "16-bit RGB565 color" }
+          ],
+          "returns": "nil",
+          "notes": "Highly optimized horizontal divider line rendering."
+        },
+        {
+          "name": "gui.fillCircle",
+          "signature": "gui.fillCircle(x, y, radius, color)",
+          "params": [
+            { "name": "x", "type": "integer", "description": "Center X" },
+            { "name": "y", "type": "integer", "description": "Center Y" },
+            { "name": "radius", "type": "integer", "description": "Circle radius in pixels" },
+            { "name": "color", "type": "integer", "description": "16-bit RGB565 color" }
+          ],
+          "returns": "nil",
+          "notes": "Useful for round icons, sliders thumbs, paint brushes, and toggle switches."
+        },
+        {
+          "name": "gui.drawPixel",
+          "signature": "gui.drawPixel(x, y, color)",
+          "params": [
+            { "name": "x", "type": "integer", "description": "Pixel X coordinate" },
+            { "name": "y", "type": "integer", "description": "Pixel Y coordinate" },
+            { "name": "color", "type": "integer", "description": "16-bit RGB565 color" }
+          ],
+          "returns": "nil",
+          "notes": "Sets an individual pixel. For large areas, always prefer gui.fillRect."
+        },
+        {
+          "name": "gui.keyboard",
+          "signature": "gui.keyboard([title, initialText])",
+          "params": [
+            { "name": "title", "type": "string", "default": "'Enter Text'", "description": "Header prompt title" },
+            { "name": "initialText", "type": "string", "default": "''", "description": "Default text populated in input box" }
+          ],
+          "returns": { "type": "string|nil", "description": "User-entered text on DONE, or nil if cancelled" },
+          "notes": "Automatically rotates display & touch digitizer into Horizontal / Landscape (320x240) mode to display a full 5-row QWERTY keyboard with Shift and Symbol modes, then restores previous orientation on close."
+        }
+      ]
+    },
+    "input": {
+      "description": "Touch input polling module for the XPT2046 resistive screen.",
+      "functions": [
+        {
+          "name": "input.getTouch",
+          "signature": "input.getTouch()",
+          "params": [],
+          "returns": [
+            { "name": "x", "type": "integer", "description": "X coordinate in screen space (0-239)" },
+            { "name": "y", "type": "integer", "description": "Y coordinate in screen space (0-319, app viewport is 20-293)" },
+            { "name": "pressed", "type": "boolean", "description": "true if display is currently pressed, false otherwise" }
+          ],
+          "notes": "Use a state variable (e.g. wasPressed) to detect touch DOWN vs HOLD vs RELEASE events."
+        }
+      ]
+    },
+    "sys": {
+      "description": "System hardware controls, telemetry, sound, and application lifecycles.",
+      "functions": [
+        {
+          "name": "sys.delay",
+          "signature": "sys.delay(ms)",
+          "params": [
+            { "name": "ms", "type": "integer", "description": "Milliseconds to wait" }
+          ],
+          "returns": "nil",
+          "notes": "MANDATORY in all while loops! Pushes OS shell tasks, routes touch inputs, and prevents watchdog timeouts."
+        },
+        {
+          "name": "sys.beep",
+          "signature": "sys.beep([freq_hz, duration_ms])",
+          "params": [
+            { "name": "freq_hz", "type": "integer", "default": 1000, "description": "Audio frequency in Hertz (e.g. 1200)" },
+            { "name": "duration_ms", "type": "integer", "default": 20, "description": "Tone duration in milliseconds" }
+          ],
+          "returns": "nil",
+          "notes": "Plays acoustic feedback on the onboard piezo buzzer on GPIO 26."
+        },
+        {
+          "name": "sys.getHeap",
+          "signature": "sys.getHeap()",
+          "params": [],
+          "returns": { "type": "integer", "description": "Free ESP32 SRAM in bytes" }
+        },
+        {
+          "name": "sys.getLdr",
+          "signature": "sys.getLdr()",
+          "params": [],
+          "returns": { "type": "integer", "description": "Ambient light analog reading (0 to 4095; lower = darker)" }
+        },
+        {
+          "name": "sys.getUptime",
+          "signature": "sys.getUptime()",
+          "params": [],
+          "returns": { "type": "integer", "description": "System uptime in seconds since boot" }
+        },
+        {
+          "name": "sys.getStorageTotal",
+          "signature": "sys.getStorageTotal()",
+          "params": [],
+          "returns": { "type": "integer", "description": "Internal LittleFS flash capacity in bytes" }
+        },
+        {
+          "name": "sys.getStorageUsed",
+          "signature": "sys.getStorageUsed()",
+          "params": [],
+          "returns": { "type": "integer", "description": "Used LittleFS storage in bytes" }
+        },
+        {
+          "name": "sys.isSDMounted",
+          "signature": "sys.isSDMounted()",
+          "params": [],
+          "returns": { "type": "boolean", "description": "true if MicroSD card is mounted and accessible, false otherwise" }
+        },
+        {
+          "name": "sys.probeSD",
+          "signature": "sys.probeSD()",
+          "params": [],
+          "returns": { "type": "boolean", "description": "Attempts to re-mount/detect MicroSD card dynamically and returns success" }
+        },
+        {
+          "name": "sys.log",
+          "signature": "sys.log(level, component, message)",
+          "params": [
+            { "name": "level", "type": "string", "description": "'INFO', 'WARN', 'ERROR', or 'FATAL'" },
+            { "name": "component", "type": "string", "description": "Component or app tag (e.g. 'MYAPP')" },
+            { "name": "message", "type": "string", "description": "Log message text" }
+          ],
+          "returns": "nil",
+          "notes": "Appends a timestamped log line to /kernel.log (and automatically mirrors to /sd/kernel.log if MicroSD is mounted). INFO and WARN respect Settings toggles; ERROR and FATAL are permanently enabled."
+        },
+        {
+          "name": "sys.getKernelLog",
+          "signature": "sys.getKernelLog()",
+          "params": [],
+          "returns": { "type": "string", "description": "Full text contents of /kernel.log (also auto-syncs to /sd/kernel.log if SD is mounted)" }
+        },
+        {
+          "name": "sys.clearKernelLog",
+          "signature": "sys.clearKernelLog()",
+          "params": [],
+          "returns": "nil",
+          "notes": "Clears /kernel.log on Flash and /sd/kernel.log on MicroSD."
+        },
+        {
+          "name": "sys.syncKernelLog",
+          "signature": "sys.syncKernelLog()",
+          "params": [],
+          "returns": { "type": "boolean", "description": "true if /kernel.log was copied to /sd/kernel.log" }
+        },
+        {
+          "name": "sys.isDevMode",
+          "signature": "sys.isDevMode()",
+          "params": [],
+          "returns": { "type": "boolean", "description": "true if Developer Mode has been unlocked by tapping Build Number 5 times in Settings" }
+        },
+        {
+          "name": "sys.installApp",
+          "signature": "sys.installApp(sdPath)",
+          "params": [
+            { "name": "sdPath", "type": "string", "description": "Path to .lua app on SD card (e.g. '/sd/apps/game.lua')" }
+          ],
+          "returns": [
+            { "name": "ok", "type": "boolean" },
+            { "name": "destPath", "type": "string", "description": "Installed local path in /apps/ on Flash" }
+          ],
+          "notes": "Copies a Lua app from MicroSD to internal Flash (/apps/) and registers it on the multi-page Home Screen launcher."
+        },
+        {
+          "name": "sys.lockScreen",
+          "signature": "sys.lockScreen([sleepDisplay])",
+          "params": [
+            { "name": "sleepDisplay", "type": "boolean", "default": false, "description": "If true, turns off LCD backlight until hardware BOOT power button or touch wake" }
+          ],
+          "returns": "nil",
+          "notes": "Locks the device and displays the Android Lock Screen (or 4-digit PIN pad if PIN Lock is enabled in Settings)."
+        },
+        {
+          "name": "wifi.getStatus",
+          "signature": "wifi.getStatus() / wifi.connect(ssid, pass) / wifi.disconnect() / wifi.scan() / wifi.getIP() / wifi.getRSSI() / wifi.getMac() / wifi.getSSID()",
+          "params": [],
+          "returns": { "type": "string|table|boolean", "description": "Full 802.11 Wi-Fi Station API: scan networks, connect with WPA2 password, read IP/RSSI/MAC, and check connection state ('CONNECTED', 'CONNECTING', 'DISCONNECTED', 'DISABLED')" }
+        },
+        {
+          "name": "sys.setLED",
+          "signature": "sys.setLED(r, g, b)",
+          "params": [
+            { "name": "r", "type": "integer", "description": "Red channel brightness (0-255)" },
+            { "name": "g", "type": "integer", "description": "Green channel brightness (0-255)" },
+            { "name": "b", "type": "integer", "description": "Blue channel brightness (0-255)" }
+          ],
+          "returns": "nil",
+          "notes": "Controls the onboard RGB LED with inverted polarity handled transparently."
+        },
+        {
+          "name": "sys.setBrightness",
+          "signature": "sys.setBrightness(brightness)",
+          "params": [
+            { "name": "brightness", "type": "integer", "description": "LCD backlight PWM level (0 to 100)" }
+          ],
+          "returns": "nil"
+        },
+        {
+          "name": "sys.setOrientation",
+          "signature": "sys.setOrientation(mode)",
+          "params": [
+            { "name": "mode", "type": "string|integer|boolean", "description": "'portrait' / 'vertical' / 0 / false for 240x320, or 'landscape' / 'horizontal' / 1 / true for 320x240" }
+          ],
+          "returns": "nil",
+          "notes": "Dynamically switches the display, touch digitizer, StatusBar, and NavBar between Portrait (240x320) and Landscape (320x240). Automatically resets to Portrait when exiting the app."
+        },
+        {
+          "name": "sys.getOrientation",
+          "signature": "sys.getOrientation()",
+          "params": [],
+          "returns": { "type": "string", "description": "Returns 'portrait' or 'landscape'" }
+        },
+        {
+          "name": "sys.getViewport",
+          "signature": "sys.getViewport()",
+          "params": [],
+          "returns": [
+            { "name": "x", "type": "integer", "description": "Viewport X (0)" },
+            { "name": "y", "type": "integer", "description": "Viewport Y (20)" },
+            { "name": "w", "type": "integer", "description": "Viewport width (240 in portrait, 320 in landscape)" },
+            { "name": "h", "type": "integer", "description": "Viewport height (274 in portrait, 194 in landscape)" }
+          ]
+        },
+        {
+          "name": "sys.getScreenSize",
+          "signature": "sys.getScreenSize()",
+          "params": [],
+          "returns": [
+            { "name": "w", "type": "integer", "description": "Screen width (240 in portrait, 320 in landscape)" },
+            { "name": "h", "type": "integer", "description": "Screen height (320 in portrait, 240 in landscape)" }
+          ]
+        },
+        {
+          "name": "sys.launch",
+          "signature": "sys.launch(path)",
+          "params": [
+            { "name": "path", "type": "string", "description": "Full path to another .lua script (e.g. '/sd/game.lua' or '/apps/calc.lua')" }
+          ],
+          "returns": "nil",
+          "notes": "Exits the current script and hands off execution to launch the target app dynamically from Flash or SD card."
+        },
+        {
+          "name": "sys.runScript",
+          "signature": "sys.runScript(path)",
+          "params": [
+            { "name": "path", "type": "string", "description": "Path to a script to execute inline" }
+          ],
+          "returns": [
+            { "name": "success", "type": "boolean", "description": "true if loaded and executed without errors" },
+            { "name": "error_msg", "type": "string", "description": "Error details if success is false" }
+          ],
+          "notes": "Executes a Lua file synchronously as a subroutine or library."
+        }
+      ]
+    },
+    "file": {
+      "description": "File system operations across LittleFS (/apps, /system) and MicroSD (/sd).",
+      "functions": [
+        {
+          "name": "file.list",
+          "signature": "file.list([directory_path])",
+          "params": [
+            { "name": "directory_path", "type": "string", "default": "/apps", "description": "Directory to inspect ('/apps', '/sd', '/sd/apps', etc.)" }
+          ],
+          "returns": {
+            "type": "table",
+            "description": "Array of file objects: { path = string, name = string, size = integer, isSD = boolean, isLua = boolean }"
+          },
+          "notes": "When scanning '/sd', automatically checks '/sd/apps' as well."
+        },
+        {
+          "name": "file.read",
+          "signature": "file.read(path)",
+          "params": [
+            { "name": "path", "type": "string", "description": "File path (e.g. '/sd/config.json')" }
+          ],
+          "returns": { "type": "string|nil", "description": "Complete file text content or nil if not found" }
+        },
+        {
+          "name": "file.write",
+          "signature": "file.write(path, content)",
+          "params": [
+            { "name": "path", "type": "string", "description": "File path to write/create" },
+            { "name": "content", "type": "string", "description": "String content to persist" }
+          ],
+          "returns": { "type": "boolean", "description": "true on successful disk write" }
+        },
+        {
+          "name": "file.remove",
+          "signature": "file.remove(path)",
+          "params": [
+            { "name": "path", "type": "string", "description": "File path to delete" }
+          ],
+          "returns": { "type": "boolean", "description": "true if file was successfully deleted" }
+        },
+        {
+          "name": "file.exists",
+          "signature": "file.exists(path)",
+          "params": [
+            { "name": "path", "type": "string", "description": "File path to verify" }
+          ],
+          "returns": { "type": "boolean", "description": "true if file exists on storage" }
+        },
+        {
+          "name": "file.run",
+          "signature": "file.run(path)",
+          "params": [
+            { "name": "path", "type": "string", "description": "Path to Lua file" }
+          ],
+          "returns": { "type": "boolean", "description": "Alias for sys.runScript(path)" }
+        }
+      ]
+    }
+  },
+  "app_design_rules": [
+    {
+      "rule": "Never draw over System Status Bar or Nav Bar",
+      "detail": "Always keep visual boundaries within X: 0 to 239, Y: 20 to 293. Drawing outside clutters OS components."
+    },
+    {
+      "rule": "Mandatory sys.delay() inside main loop",
+      "detail": "Call `sys.delay(15)` to `sys.delay(30)` in every iteration of your app_main loop. Without this, the watchdog will panic or the Back/Home buttons won't respond."
+    },
+    {
+      "rule": "Flicker-Free UI (Differential / Dirty Rendering)",
+      "detail": "Never call full-screen clears inside the main touch loop. Paint the full UI once on startup, then redraw only the specific rectangles/buttons that change state."
+    },
+    {
+      "rule": "Touch State Management",
+      "detail": "Resistive touch screens produce continuous 'true' while pressed. Track `wasPressed` to detect a fresh press (DOWN) versus continuous drag versus release (UP)."
+    },
+    {
+      "rule": "Acoustic & Visual Feedback",
+      "detail": "Include a subtle audio beep `sys.beep(1200, 15)` and momentary button highlight when a user interacts with a touch target."
+    },
+    {
+      "rule": "Safe Memory Practices",
+      "detail": "Avoid repeatedly concatenating large strings or allocating temporary tables inside 30-fps render loops to prevent GC pauses."
+    }
+  ],
+  "standard_file_header": [
+    "-- ===================================================================",
+    "-- CYD Android OS Application",
+    "-- @name: App Display Name",
+    "-- @icon: ICON_APP",
+    "-- @orientation: portrait",
+    "-- @author: Developer Name",
+    "-- @version: 1.0.0",
+    "-- @description: Concise description of application purpose",
+    "-- ==================================================================="
+  ],
+  "sample_apps": {
+    "hello_world_portrait": {
+      "title": "Minimal Portrait App (240x274 Default Viewport)",
+      "lua_code": "-- Minimal CYD Portrait Lua App\n-- @orientation: portrait\nlocal VP_X, VP_Y, VP_W, VP_H = 0, 20, 240, 274\n\ngui.fillRect(VP_X, VP_Y, VP_W, VP_H, 0x0821)\ngui.fillRect(12, VP_Y + 16, 216, 140, 0x18E3)\ngui.drawRect(12, VP_Y + 16, 216, 140, 0x39E7)\n\ngui.drawText(24, VP_Y + 28, \"Hello CYD Portrait!\", 0x07FF, 2)\ngui.drawText(24, VP_Y + 54, \"240x320 Vertical Mode\", 0xFFFF, 1)\n\nlocal count = 0\nlocal lastPressed = false\n\nwhile true do\n    local tx, ty, pressed = input.getTouch()\n    if pressed and not lastPressed then\n        if tx >= 12 and tx <= 228 and ty >= (VP_Y + 16) and ty <= (VP_Y + 156) then\n            count = count + 1\n            sys.beep(1500, 15)\n            gui.fillRect(24, VP_Y + 80, 190, 20, 0x18E3)\n            gui.drawText(24, VP_Y + 80, \"Taps: \" .. count .. \" | Heap: \" .. sys.getHeap() .. \"B\", 0x07E0, 1)\n        end\n        lastPressed = true\n    elseif not pressed and lastPressed then\n        lastPressed = false\n    end\n    sys.delay(20)\nend"
+    },
+    "hello_world_landscape": {
+      "title": "Landscape App using Compatibility Layer (320x194 Viewport)",
+      "lua_code": "-- Minimal CYD Landscape Lua App\n-- @orientation: landscape\nlocal VP_X, VP_Y, VP_W, VP_H = 0, 20, 320, 194\n\ngui.fillRect(VP_X, VP_Y, VP_W, VP_H, 0x0821)\ngui.fillRect(16, VP_Y + 16, 288, 120, 0x18E3)\ngui.drawRect(16, VP_Y + 16, 288, 120, 0x39E7)\n\ngui.drawText(28, VP_Y + 28, \"Hello, CYD Landscape!\", 0x07FF, 2)\ngui.drawText(28, VP_Y + 54, \"Auto-rotated to 320x240\", 0xFFFF, 1)\n\nlocal count = 0\nlocal lastPressed = false\n\nwhile true do\n    local tx, ty, pressed = input.getTouch()\n    if pressed and not lastPressed then\n        if tx >= 16 and tx <= 304 and ty >= (VP_Y + 16) and ty <= (VP_Y + 136) then\n            count = count + 1\n            sys.beep(1500, 15)\n            gui.fillRect(28, VP_Y + 75, 260, 20, 0x18E3)\n            gui.drawText(28, VP_Y + 75, \"Taps: \" .. count .. \" | Heap: \" .. sys.getHeap() .. \"B\", 0x07E0, 1)\n        end\n        lastPressed = true\n    elseif not pressed and lastPressed then\n        lastPressed = false\n    end\n    sys.delay(20)\nend"
+    },
+    "custom_touch_button_pattern": {
+      "title": "Clean Reusable Button Handler Pattern",
+      "lua_code": "local buttons = {\n    { id = \"btn1\", x = 20,  y = 60, w = 130, h = 40, label = \"ENABLE\",  color = 0x04F5 },\n    { id = \"btn2\", x = 170, y = 60, w = 130, h = 40, label = \"DISABLE\", color = 0x4208 }\n}\n\nlocal function drawButton(b, isPressed)\n    local bg = isPressed and 0xFFFF or b.color\n    local fg = isPressed and 0x0000 or 0xFFFF\n    gui.fillRect(b.x, b.y, b.w, b.h, bg)\n    gui.drawRect(b.x, b.y, b.w, b.h, 0x0000)\n    local tx = b.x + math.floor((b.w - (#b.label * 8)) / 2)\n    local ty = b.y + math.floor((b.h - 16) / 2)\n    gui.drawText(tx, ty, b.label, fg, 2)\nend\n\n-- Initial render\nfor _, b in ipairs(buttons) do drawButton(b, false) end\n\nlocal activeBtn = nil\nwhile true do\n    local tx, ty, touched = input.getTouch()\n    if touched then\n        for _, b in ipairs(buttons) do\n            if tx >= b.x and tx <= (b.x + b.w) and ty >= b.y and ty <= (b.y + b.h) then\n                if activeBtn ~= b.id then\n                    activeBtn = b.id\n                    drawButton(b, true)\n                    sys.beep(1200, 20)\n                    -- Perform button action here\n                end\n            end\n        end\n    else\n        if activeBtn then\n            for _, b in ipairs(buttons) do\n                if b.id == activeBtn then drawButton(b, false) end\n            end\n            activeBtn = nil\n        end\n    end\n    sys.delay(20)\nend"
+    },
+    "sd_card_app_launcher": {
+      "title": "Dynamic SD Card File Reader & App Launcher",
+      "lua_code": "local VP_Y = 20\ngui.fillRect(0, VP_Y, 320, 194, 0x0821)\ngui.drawText(10, VP_Y + 10, \"SD Card Apps Explorer\", 0x07FF, 2)\n\nif not sys.isSDMounted() then\n    sys.probeSD()\nend\n\nlocal files = file.list(\"/sd\")\nlocal yOffset = VP_Y + 36\nfor i, f in ipairs(files) do\n    if f.isLua and i <= 5 then\n        gui.fillRect(10, yOffset, 300, 26, 0x18E3)\n        gui.drawRect(10, yOffset, 300, 26, 0x39E7)\n        gui.drawText(16, yOffset + 5, f.name .. \" (\" .. f.size .. \"B)\", 0xFFFF, 2)\n        yOffset = yOffset + 30\n    end\nend\n\nwhile true do\n    local tx, ty, pressed = input.getTouch()\n    if pressed then\n        local index = math.floor((ty - (VP_Y + 36)) / 30) + 1\n        if index >= 1 and index <= #files and files[index].isLua then\n            sys.beep(1600, 40)\n            -- Launch the selected app dynamically into the OS\n            sys.launch(files[index].path)\n            break\n        end\n    end\n    sys.delay(25)\nend"
+    }
+  },
+  "deployment_and_testing": {
+    "storage_options": [
+      {
+        "medium": "MicroSD Card (/sd)",
+        "path_pattern": "/sd/*.lua or /sd/apps/*.lua",
+        "hot_reload": "True. Place script on FAT32 MicroSD card, insert into CYD, open 'Files' app, tap script, and press '> RUN LUA APP'. No reflash needed."
+      },
+      {
+        "medium": "Internal Flash LittleFS (/apps)",
+        "path_pattern": "/apps/*.lua",
+        "hot_reload": "Persisted on LittleFS. Can be written via file.write() from Lua IDE / Terminal, or bundled into data/apps/"
+      }
+    ],
+    "debugging_tips": [
+      "If a script throws a runtime or syntax error, the OS catches it and renders a red 'Script error' screen with the exact line number and error message.",
+      "Always call sys.delay(ms) in loops so the user can press the hardware Nav Bar Home or Back button to exit safely back to the launcher."
+    ]
+  }
+}
