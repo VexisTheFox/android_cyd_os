@@ -34,10 +34,7 @@ void BootView::reset() {
 }
 
 void BootView::drawFursonaLogo(int32_t topX, int32_t topY) {
-    bool prevSwap = m_display.getSwapBytes();
-    m_display.setSwapBytes(true);
-    m_display.pushImage(topX, topY, FURSONA_LOGO_W, FURSONA_LOGO_H, FURSONA_LOGO_RGB565);
-    m_display.setSwapBytes(prevSwap);
+    ui::drawFursonaLogo(m_display, topX, topY);
 }
 
 void BootView::drawPoweredByAndroidFooter() {
@@ -71,15 +68,15 @@ void BootView::render() {
 
     m_display.fillScreen(COLOR_BG);
 
-    // 1. Custom Fursona Boot Logo (108x142 RGB565 PROGMEM centered at Y=8..149)
+    // 1. Custom Fursona Boot Logo (76x100 Paletted PROGMEM centered at Y=16..116)
     int32_t logoX = (SCREEN_WIDTH - FURSONA_LOGO_W) / 2;
-    drawFursonaLogo(logoX, 8);
+    drawFursonaLogo(logoX, 16);
 
     // 2. Stable Release OS Title ("cydOS V1.0")
     m_display.setTextDatum(TC_DATUM);
     m_display.setTextColor(COLOR_TITLE, COLOR_BG);
     m_display.setTextFont(4);
-    m_display.drawString(CYDOS_FULL_NAME, SCREEN_WIDTH / 2, 158);
+    m_display.drawString(CYDOS_FULL_NAME, SCREEN_WIDTH / 2, 136);
     m_display.setTextDatum(TL_DATUM);
 
     // 3. Progress Bar Frame & Fill
