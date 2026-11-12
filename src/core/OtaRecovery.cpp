@@ -447,7 +447,7 @@ void OtaRecovery::triggerRebootToOtaRecovery() {
     tft.drawString("REBOOTING TO RECOVERY", 120, 138);
     tft.setTextFont(1);
     tft.setTextColor(TFT_WHITE, 0x10A2);
-    tft.drawString("Entering cydOS System Recovery Menu...", 120, 168);
+    tft.drawString("Starting OTA Firmware Updater...", 120, 168);
 
     hal::beep(60);
     delay(600);
@@ -457,7 +457,6 @@ void OtaRecovery::triggerRebootToOtaRecovery() {
 void OtaRecovery::checkAndRunOnBoot() {
     Preferences prefs;
     bool pending = false;
-    bool hwButtonTriggered = false;
     if (prefs.begin(OTA_NVS_NS, false)) {
         pending = prefs.getBool(OTA_NVS_KEY, false);
         if (pending) {
@@ -465,6 +464,7 @@ void OtaRecovery::checkAndRunOnBoot() {
         }
         prefs.end();
     }
+    bool autoStartOta = pending;
 
     // Hardware Recovery Trigger: check physical BOOT button (GPIO 0, active-LOW) during early startup
     if (!pending) {
@@ -500,7 +500,6 @@ void OtaRecovery::checkAndRunOnBoot() {
                 }
                 if (heldFull) {
                     pending = true;
-                    hwButtonTriggered = true;
                     hal::beep(90);
                 }
                 break;
@@ -514,14 +513,25 @@ void OtaRecovery::checkAndRunOnBoot() {
         }
     }
 
-    // Initialize required HAL subsystems for interactive Recovery Menu
+    // Initialize required HAL subsystems for interactive Recovery Menu / Auto OTA
     hal::initBoard();
     StorageHAL::init();
     hal::initTouch();
     hal::setTouchRotation(0);
+    if (Config::getInstance().isTouchCalibrated()) {
+        hal::TouchCalibration cal = hal::getTouchCalibration();
+        Config::getInstance().getTouchCal(cal.minRawX, cal.maxRawX, cal.minRawY, cal.maxRawY);
+        hal::setTouchCalibration(cal);
+    }
     hal::setBacklight(95);
 
     TFT_eSPI &tft = hal::getDisplay();
+
+    // If rebooted from Settings / Update Popup, automatically start OTA reflash
+    if (autoStartOta) {
+        runOtaReflash(tft);
+        // Only reaches here if OTA failed; fall through to interactive Recovery Menu
+    }
 
     bool confirmReset = false;
     drawRecoveryMenu(tft, confirmReset);

@@ -28,29 +28,6 @@
 #include "core/OtaRecovery.h"
 #include <WiFi.h>
 
-// ============================================================================
-// Xiaomi SU7 Ultra 3D Telemetry Reference Subsystem (Verification Suite)
-// ============================================================================
-static const float ROT_SPEED = 0.038f;
-static float yawAngle = 0.0f;
-static float currentFps = 58.0f;
-
-void updateDynamicHUD(int degrees) {
-    yawAngle = (float)degrees * (3.14159f / 180.0f) + ROT_SPEED;
-    char buf[32];
-    snprintf(buf, sizeof(buf), "YAW:%3d` %2.0fFPS", degrees, currentFps);
-    (void)buf;
-}
-
-void initSU7TelemetrySprites(TFT_eSPI* tft) {
-    if (!tft) return;
-    TFT_eSprite sprite = TFT_eSprite(tft);
-    TFT_eSprite hudSprite = TFT_eSprite(tft);
-    sprite.createSprite(320, 172);
-    sprite.pushSprite(0, 34);
-    hudSprite.pushSprite(190, 211);
-}
-
 // Lua VM + TFT drawing need more than the default 8 KB loop stack
 SET_LOOP_TASK_STACK_SIZE(20 * 1024);
 
@@ -98,9 +75,16 @@ void setup() {
     ui::UIManager::setBootProgress(35, "Storage ready");
 
     // 5. Initialize Touch HAL on Dedicated VSPI Bus
-    // Calibrates XPT2046 digitizer coordinates to 320x240 screen pixels.
+    // Calibrates XPT2046 digitizer coordinates to 240x320 screen pixels.
     Serial.println(F("[BOOT] Initializing Touch HAL (XPT2046 @ 2.5 MHz)..."));
     hal::initTouch();
+    if (Config::getInstance().isTouchCalibrated()) {
+        hal::TouchCalibration cal = hal::getTouchCalibration();
+        Config::getInstance().getTouchCal(cal.minRawX, cal.maxRawX, cal.minRawY, cal.maxRawY);
+        hal::setTouchCalibration(cal);
+        LOG_INFO("TOUCH", "Loaded NVS calibration: X[%u..%u] Y[%u..%u]",
+                 cal.minRawX, cal.maxRawX, cal.minRawY, cal.maxRawY);
+    }
     ui::UIManager::setBootProgress(65, "Touch calibrated");
 
     // 6. Initialize Onboard Peripherals (RGB LED, LDR Photoresistor, Buzzer)

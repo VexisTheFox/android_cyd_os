@@ -41,6 +41,15 @@ void Config::clampConfig(SystemConfig& cfg) {
     if (cfg.wallpaperId > 5 && cfg.wallpaperId != CONFIG_WALLPAPER_CUSTOM_SD) {
         cfg.wallpaperId = 0;
     }
+
+    if (cfg.touchMaxX <= cfg.touchMinX + 400 || cfg.touchMaxX > 4095 ||
+        cfg.touchMaxY <= cfg.touchMinY + 400 || cfg.touchMaxY > 4095) {
+        cfg.touchMinX = 240;
+        cfg.touchMaxX = 3800;
+        cfg.touchMinY = 200;
+        cfg.touchMaxY = 3700;
+        cfg.touchCalibrated = false;
+    }
 }
 
 bool Config::begin() {
@@ -68,26 +77,28 @@ bool Config::load() {
     m_config.pinEnabled        = prefs.getBool("pinEn", CONFIG_DEFAULT_PIN_ENABLED);
     m_config.wifiEnabled       = prefs.getBool("wifiEn", CONFIG_DEFAULT_WIFI_ENABLED);
     m_config.wallpaperId       = prefs.getUChar("wpId", 0);
+    m_config.touchCalibrated   = prefs.getBool("tCalOk", false);
+    m_config.touchMinX         = prefs.getUShort("tMinX", 240);
+    m_config.touchMaxX         = prefs.getUShort("tMaxX", 3800);
+    m_config.touchMinY         = prefs.getUShort("tMinY", 200);
+    m_config.touchMaxY         = prefs.getUShort("tMaxY", 3700);
 
-    String savedPin = prefs.getString("pinCode", CONFIG_DEFAULT_PIN_CODE);
-    strncpy(m_config.pinCode, savedPin.c_str(), sizeof(m_config.pinCode) - 1);
-    m_config.pinCode[sizeof(m_config.pinCode) - 1] = '\0';
-
-    String savedSsid = prefs.getString("wifiSsid", "");
-    strncpy(m_config.wifiSsid, savedSsid.c_str(), sizeof(m_config.wifiSsid) - 1);
-    m_config.wifiSsid[sizeof(m_config.wifiSsid) - 1] = '\0';
-
-    String savedPass = prefs.getString("wifiPass", "");
-    strncpy(m_config.wifiPass, savedPass.c_str(), sizeof(m_config.wifiPass) - 1);
-    m_config.wifiPass[sizeof(m_config.wifiPass) - 1] = '\0';
-
-    String savedRegion = prefs.getString("region", "");
-    strncpy(m_config.region, savedRegion.c_str(), sizeof(m_config.region) - 1);
-    m_config.region[sizeof(m_config.region) - 1] = '\0';
-
-    String savedWpPath = prefs.getString("wpPath", "");
-    strncpy(m_config.wallpaperPath, savedWpPath.c_str(), sizeof(m_config.wallpaperPath) - 1);
-    m_config.wallpaperPath[sizeof(m_config.wallpaperPath) - 1] = '\0';
+    if (prefs.getString("pinCode", m_config.pinCode, sizeof(m_config.pinCode)) == 0) {
+        strncpy(m_config.pinCode, CONFIG_DEFAULT_PIN_CODE, sizeof(m_config.pinCode) - 1);
+        m_config.pinCode[sizeof(m_config.pinCode) - 1] = '\0';
+    }
+    if (prefs.getString("wifiSsid", m_config.wifiSsid, sizeof(m_config.wifiSsid)) == 0) {
+        m_config.wifiSsid[0] = '\0';
+    }
+    if (prefs.getString("wifiPass", m_config.wifiPass, sizeof(m_config.wifiPass)) == 0) {
+        m_config.wifiPass[0] = '\0';
+    }
+    if (prefs.getString("region", m_config.region, sizeof(m_config.region)) == 0) {
+        m_config.region[0] = '\0';
+    }
+    if (prefs.getString("wpPath", m_config.wallpaperPath, sizeof(m_config.wallpaperPath)) == 0) {
+        m_config.wallpaperPath[0] = '\0';
+    }
 
     prefs.end();
 
@@ -120,6 +131,11 @@ bool Config::save() {
     prefs.putString("region", m_config.region);
     prefs.putUChar("wpId", m_config.wallpaperId);
     prefs.putString("wpPath", m_config.wallpaperPath);
+    prefs.putBool("tCalOk", m_config.touchCalibrated);
+    prefs.putUShort("tMinX", m_config.touchMinX);
+    prefs.putUShort("tMaxX", m_config.touchMaxX);
+    prefs.putUShort("tMinY", m_config.touchMinY);
+    prefs.putUShort("tMaxY", m_config.touchMaxY);
     prefs.end();
 
     m_dirty = false;
@@ -278,6 +294,17 @@ void Config::setWallpaperPath(const char* path, bool autoSave) {
         m_dirty = true;
         if (autoSave) save();
     }
+}
+
+void Config::setTouchCal(uint16_t minX, uint16_t maxX, uint16_t minY, uint16_t maxY, bool autoSave) {
+    m_config.touchMinX = minX;
+    m_config.touchMaxX = maxX;
+    m_config.touchMinY = minY;
+    m_config.touchMaxY = maxY;
+    m_config.touchCalibrated = true;
+    clampConfig(m_config);
+    m_dirty = true;
+    if (autoSave) save();
 }
 
 void Config::set(const SystemConfig& cfg, bool autoSave) {

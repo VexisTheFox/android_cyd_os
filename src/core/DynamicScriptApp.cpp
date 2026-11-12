@@ -1701,6 +1701,8 @@ void DynamicScriptApp::runScript() {
         return;
     }
     openSandbox(L);
+    lua_gc(L, LUA_GCSETPAUSE, 110);
+    lua_gc(L, LUA_GCSETSTEPMUL, 250);
     lua_sethook(L, hookFn, LUA_MASKCOUNT, 500);
 
     s_abort = false;

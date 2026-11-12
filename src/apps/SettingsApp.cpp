@@ -9,6 +9,7 @@
 #include "core/TimeService.h"
 #include "core/OtaRecovery.h"
 #include "hal/StorageHAL.h"
+#include "hal/TouchHAL.h"
 #include "ui/UIManager.h"
 #include "ui/KeyboardView.h"
 #include <WiFi.h>
@@ -516,52 +517,52 @@ void SettingsApp::drawDisplaySoundPage(TFT_eSPI &display, int vx, int vy, int vw
     int cardW = vw - 12;
 
     // 1. Brightness Card
-    int y1 = bodyY + 6;
-    display.fillRoundRect(cardX, y1, cardW, 58, 6, COLOR_CARD);
-    display.drawRoundRect(cardX, y1, cardW, 58, 6, COLOR_DIVIDER);
+    int y1 = bodyY + 4;
+    display.fillRoundRect(cardX, y1, cardW, 52, 6, COLOR_CARD);
+    display.drawRoundRect(cardX, y1, cardW, 52, 6, COLOR_DIVIDER);
     display.setTextFont(1);
     display.setTextDatum(TL_DATUM);
     display.setTextColor(COLOR_CYAN, COLOR_CARD);
-    display.drawString("SCREEN BRIGHTNESS", cardX + 8, y1 + 6);
+    display.drawString("SCREEN BRIGHTNESS", cardX + 8, y1 + 5);
 
     char bVal[16];
     snprintf(bVal, sizeof(bVal), "%u%%", m_brightness);
     display.setTextDatum(TR_DATUM);
     display.setTextColor(COLOR_AMBER, COLOR_CARD);
-    display.drawString(bVal, cardX + cardW - 8, y1 + 6);
+    display.drawString(bVal, cardX + cardW - 8, y1 + 5);
 
     // [-] Button
-    display.fillRoundRect(cardX + 8, y1 + 22, 34, 28, 5, 0x10A2);
-    display.drawRoundRect(cardX + 8, y1 + 22, 34, 28, 5, COLOR_DIVIDER);
+    display.fillRoundRect(cardX + 8, y1 + 19, 34, 26, 5, 0x10A2);
+    display.drawRoundRect(cardX + 8, y1 + 19, 34, 26, 5, COLOR_DIVIDER);
     display.setTextFont(2);
     display.setTextDatum(MC_DATUM);
     display.setTextColor(COLOR_WHITE, 0x10A2);
-    display.drawString("-", cardX + 25, y1 + 36);
+    display.drawString("-", cardX + 25, y1 + 32);
 
     // Slider Bar
     int barX = cardX + 48;
     int barW = cardW - 96;
-    display.fillRoundRect(barX, y1 + 29, barW, 14, 4, 0x0821);
-    display.drawRoundRect(barX, y1 + 29, barW, 14, 4, COLOR_DIVIDER);
+    display.fillRoundRect(barX, y1 + 25, barW, 14, 4, 0x0821);
+    display.drawRoundRect(barX, y1 + 25, barW, 14, 4, COLOR_DIVIDER);
     int fillW = (m_brightness * (barW - 4)) / 100;
     if (fillW > 0) {
-        display.fillRoundRect(barX + 2, y1 + 31, fillW, 10, 3, COLOR_CYAN);
+        display.fillRoundRect(barX + 2, y1 + 27, fillW, 10, 3, COLOR_CYAN);
     }
 
     // [+] Button
-    display.fillRoundRect(cardX + cardW - 42, y1 + 22, 34, 28, 5, 0x10A2);
-    display.drawRoundRect(cardX + cardW - 42, y1 + 22, 34, 28, 5, COLOR_DIVIDER);
+    display.fillRoundRect(cardX + cardW - 42, y1 + 19, 34, 26, 5, 0x10A2);
+    display.drawRoundRect(cardX + cardW - 42, y1 + 19, 34, 26, 5, COLOR_DIVIDER);
     display.setTextColor(COLOR_WHITE, 0x10A2);
-    display.drawString("+", cardX + cardW - 25, y1 + 36);
+    display.drawString("+", cardX + cardW - 25, y1 + 32);
 
     // 2. Auto-Sleep Timeout Card
-    int y2 = bodyY + 70;
-    display.fillRoundRect(cardX, y2, cardW, 54, 6, COLOR_CARD);
-    display.drawRoundRect(cardX, y2, cardW, 54, 6, COLOR_DIVIDER);
+    int y2 = bodyY + 60;
+    display.fillRoundRect(cardX, y2, cardW, 50, 6, COLOR_CARD);
+    display.drawRoundRect(cardX, y2, cardW, 50, 6, COLOR_DIVIDER);
     display.setTextFont(1);
     display.setTextDatum(TL_DATUM);
     display.setTextColor(COLOR_CYAN, COLOR_CARD);
-    display.drawString("AUTO-SLEEP (BOOT = WAKE/SLEEP)", cardX + 8, y2 + 6);
+    display.drawString("AUTO-SLEEP (BOOT = WAKE/SLEEP)", cardX + 8, y2 + 5);
 
     const uint16_t presets[5] = { 15, 30, 60, 120, 0 };
     const char* labels[5]     = { "15s", "30s", "1m", "2m", "OFF" };
@@ -570,50 +571,60 @@ void SettingsApp::drawDisplaySoundPage(TFT_eSPI &display, int vx, int vy, int vw
         bool active = (m_sleepTimeoutSec == presets[i]);
         uint16_t bg = active ? COLOR_GREEN : 0x10A2;
         uint16_t fg = active ? TFT_BLACK : COLOR_WHITE;
-        display.fillRoundRect(bx, y2 + 22, 39, 24, 4, bg);
-        display.drawRoundRect(bx, y2 + 22, 39, 24, 4, active ? COLOR_WHITE : COLOR_DIVIDER);
+        display.fillRoundRect(bx, y2 + 20, 39, 23, 4, bg);
+        display.drawRoundRect(bx, y2 + 20, 39, 23, 4, active ? COLOR_WHITE : COLOR_DIVIDER);
         display.setTextDatum(MC_DATUM);
         display.setTextColor(fg, bg);
-        display.drawString(labels[i], bx + 19, y2 + 34);
+        display.drawString(labels[i], bx + 19, y2 + 31);
     }
 
     // 3. System Touch Sound Card
-    int y3 = bodyY + 130;
-    display.fillRoundRect(cardX, y3, cardW, 48, 6, COLOR_CARD);
-    display.drawRoundRect(cardX, y3, cardW, 48, 6, COLOR_DIVIDER);
+    int y3 = bodyY + 114;
+    display.fillRoundRect(cardX, y3, cardW, 42, 6, COLOR_CARD);
+    display.drawRoundRect(cardX, y3, cardW, 42, 6, COLOR_DIVIDER);
     display.setTextDatum(TL_DATUM);
     display.setTextFont(2);
     display.setTextColor(COLOR_WHITE, COLOR_CARD);
-    display.drawString("System Touch Audio", cardX + 8, y3 + 6);
+    display.drawString("System Touch Audio", cardX + 8, y3 + 4);
     display.setTextFont(1);
     display.setTextColor(COLOR_MUTED, COLOR_CARD);
-    display.drawString("Piezo clicks & alert tones", cardX + 8, y3 + 27);
+    display.drawString("Piezo clicks & alert tones", cardX + 8, y3 + 24);
 
     uint16_t sndCol = m_soundEnabled ? COLOR_GREEN : 0x4208;
-    display.fillRoundRect(cardX + cardW - 68, y3 + 12, 60, 24, 12, sndCol);
+    display.fillRoundRect(cardX + cardW - 68, y3 + 9, 60, 24, 12, sndCol);
     display.setTextDatum(MC_DATUM);
     display.setTextColor(m_soundEnabled ? TFT_BLACK : COLOR_WHITE, sndCol);
-    display.drawString(m_soundEnabled ? "SOUND ON" : "MUTED", cardX + cardW - 38, y3 + 24);
+    display.drawString(m_soundEnabled ? "SOUND ON" : "MUTED", cardX + cardW - 38, y3 + 21);
 
     // 4. Onboard RGB LED Control Card
-    int y4 = bodyY + 184;
-    display.fillRoundRect(cardX, y4, cardW, 56, 6, COLOR_CARD);
-    display.drawRoundRect(cardX, y4, cardW, 56, 6, COLOR_DIVIDER);
+    int y4 = bodyY + 160;
+    display.fillRoundRect(cardX, y4, cardW, 48, 6, COLOR_CARD);
+    display.drawRoundRect(cardX, y4, cardW, 48, 6, COLOR_DIVIDER);
     display.setTextDatum(TL_DATUM);
     display.setTextColor(COLOR_CYAN, COLOR_CARD);
-    display.drawString("ONBOARD RGB STATUS LED", cardX + 8, y4 + 6);
+    display.drawString("ONBOARD RGB STATUS LED", cardX + 8, y4 + 5);
 
     const char* ledNames[5] = { "OFF", "RED", "GRN", "BLU", "CYN" };
     const uint16_t ledCols[5] = { 0x2124, 0x9000, 0x04A0, 0x0276, 0x04D3 };
     for (int i = 0; i < 5; i++) {
         int bx = cardX + 8 + i * 43;
         bool sel = (m_ledState == i);
-        display.fillRoundRect(bx, y4 + 22, 39, 26, 4, ledCols[i]);
-        display.drawRoundRect(bx, y4 + 22, 39, 26, 4, sel ? COLOR_AMBER : COLOR_DIVIDER);
+        display.fillRoundRect(bx, y4 + 19, 39, 23, 4, ledCols[i]);
+        display.drawRoundRect(bx, y4 + 19, 39, 23, 4, sel ? COLOR_AMBER : COLOR_DIVIDER);
         display.setTextDatum(MC_DATUM);
         display.setTextColor(COLOR_WHITE, ledCols[i]);
-        display.drawString(ledNames[i], bx + 19, y4 + 35);
+        display.drawString(ledNames[i], bx + 19, y4 + 30);
     }
+
+    // 5. Touchscreen Calibration Button
+    int y5 = bodyY + 212;
+    display.fillRoundRect(cardX, y5, cardW, 32, 6, 0x2166);
+    display.drawRoundRect(cardX, y5, cardW, 32, 6, COLOR_CYAN);
+    display.setTextFont(2);
+    display.setTextDatum(MC_DATUM);
+    display.setTextColor(COLOR_CYAN, 0x2166);
+    display.drawString("CALIBRATE TOUCHSCREEN", vx + vw / 2, y5 + 16);
+    display.setTextFont(1);
     display.setTextDatum(TL_DATUM);
 }
 
@@ -1184,8 +1195,8 @@ void SettingsApp::handleWifiTap(uint16_t x, uint16_t y) {
 void SettingsApp::handleDisplaySoundTap(uint16_t x, uint16_t y) {
     int relY = (int)y - HEADER_H;
 
-    // 1. Brightness Card (relY = 6..64)
-    if (relY >= 6 && relY <= 64) {
+    // 1. Brightness Card (relY = 4..56)
+    if (relY >= 4 && relY <= 56) {
         if (x < 50) {
             int nb = (int)m_brightness - 10;
             if (nb < 10) nb = 10;
@@ -1207,8 +1218,8 @@ void SettingsApp::handleDisplaySoundTap(uint16_t x, uint16_t y) {
         return;
     }
 
-    // 2. Auto-Sleep Timeout presets (relY = 70..124)
-    if (relY >= 70 && relY <= 124) {
+    // 2. Auto-Sleep Timeout presets (relY = 60..110)
+    if (relY >= 60 && relY <= 110) {
         const uint16_t presets[5] = { 15, 30, 60, 120, 0 };
         int idx = ((int)x - 14) / 43;
         if (idx >= 0 && idx < 5) {
@@ -1220,8 +1231,8 @@ void SettingsApp::handleDisplaySoundTap(uint16_t x, uint16_t y) {
         return;
     }
 
-    // 3. System Touch Audio (relY = 130..178)
-    if (relY >= 130 && relY <= 178) {
+    // 3. System Touch Audio (relY = 114..156)
+    if (relY >= 114 && relY <= 156) {
         m_soundEnabled = !m_soundEnabled;
         Config::getInstance().setSoundEnabled(m_soundEnabled, true);
         if (m_soundEnabled) hal::beep(35);
@@ -1229,8 +1240,8 @@ void SettingsApp::handleDisplaySoundTap(uint16_t x, uint16_t y) {
         return;
     }
 
-    // 4. Onboard RGB LED (relY = 184..242)
-    if (relY >= 184 && relY <= 242) {
+    // 4. Onboard RGB LED (relY = 160..208)
+    if (relY >= 160 && relY <= 208) {
         int idx = ((int)x - 14) / 43;
         if (idx >= 0 && idx < 5) {
             m_ledState = (uint8_t)idx;
@@ -1244,6 +1255,21 @@ void SettingsApp::handleDisplaySoundTap(uint16_t x, uint16_t y) {
             hal::beep(20);
             m_needsFullRedraw = true;
         }
+        return;
+    }
+
+    // 5. Touchscreen Calibration (relY = 212..244)
+    if (relY >= 212 && relY <= 246) {
+        hal::beep(35);
+        bool ok = hal::runInteractiveCalibration(hal::getDisplay());
+        m_needsFullRedraw = true;
+        ui::UIManager::render(true);
+        if (ok) {
+            ui::UIManager::showToast("Touchscreen Calibrated!", 1600);
+        } else {
+            ui::UIManager::showToast("Calibration cancelled", 1200);
+        }
+        return;
     }
 }
 

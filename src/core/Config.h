@@ -55,6 +55,11 @@ struct SystemConfig {
     char     region[24];        ///< Short country/region name (e.g. "Czechia", "USA", "Albania")
     uint8_t  wallpaperId;       ///< 0..5 = built-in preset, 255 = custom SD/Flash image
     char     wallpaperPath[64]; ///< Custom wallpaper image path on SD or Flash
+    uint16_t touchMinX;         ///< Calibrated XPT2046 raw X min
+    uint16_t touchMaxX;         ///< Calibrated XPT2046 raw X max
+    uint16_t touchMinY;         ///< Calibrated XPT2046 raw Y min
+    uint16_t touchMaxY;         ///< Calibrated XPT2046 raw Y max
+    bool     touchCalibrated;   ///< True once user has completed touch calibration
 
     SystemConfig()
         : brightness(CONFIG_DEFAULT_BRIGHTNESS)
@@ -67,7 +72,12 @@ struct SystemConfig {
         , devModeEnabled(CONFIG_DEFAULT_DEV_MODE)
         , pinEnabled(CONFIG_DEFAULT_PIN_ENABLED)
         , wifiEnabled(CONFIG_DEFAULT_WIFI_ENABLED)
-        , wallpaperId(0) {
+        , wallpaperId(0)
+        , touchMinX(240)
+        , touchMaxX(3800)
+        , touchMinY(200)
+        , touchMaxY(3700)
+        , touchCalibrated(false) {
         strncpy(pinCode, CONFIG_DEFAULT_PIN_CODE, sizeof(pinCode) - 1);
         pinCode[sizeof(pinCode) - 1] = '\0';
         wifiSsid[0] = '\0';
@@ -77,7 +87,7 @@ struct SystemConfig {
     }
 
     SystemConfig(uint8_t b, uint16_t s, uint8_t t, bool snd, bool led = true, bool lInfo = true, bool lWarn = true, bool dev = false)
-        : brightness(b), sleepTimeoutSec(s), theme(t), soundEnabled(snd), ledEnabled(led), logInfoEnabled(lInfo), logWarnEnabled(lWarn), devModeEnabled(dev), pinEnabled(false), wifiEnabled(false), wallpaperId(0) {
+        : brightness(b), sleepTimeoutSec(s), theme(t), soundEnabled(snd), ledEnabled(led), logInfoEnabled(lInfo), logWarnEnabled(lWarn), devModeEnabled(dev), pinEnabled(false), wifiEnabled(false), wallpaperId(0), touchMinX(240), touchMaxX(3800), touchMinY(200), touchMaxY(3700), touchCalibrated(false) {
         strncpy(pinCode, CONFIG_DEFAULT_PIN_CODE, sizeof(pinCode) - 1);
         pinCode[sizeof(pinCode) - 1] = '\0';
         wifiSsid[0] = '\0';
@@ -117,6 +127,13 @@ public:
     bool     hasRegion() const           { return m_config.region[0] != '\0'; }
     uint8_t  getWallpaperId() const      { return m_config.wallpaperId; }
     const char* getWallpaperPath() const { return m_config.wallpaperPath; }
+    bool     isTouchCalibrated() const   { return m_config.touchCalibrated; }
+    void     getTouchCal(uint16_t &minX, uint16_t &maxX, uint16_t &minY, uint16_t &maxY) const {
+        minX = m_config.touchMinX;
+        maxX = m_config.touchMaxX;
+        minY = m_config.touchMinY;
+        maxY = m_config.touchMaxY;
+    }
     const SystemConfig& get() const      { return m_config; }
     bool     isDirty() const             { return m_dirty; }
 
@@ -137,6 +154,7 @@ public:
     void setRegion(const char* region, bool autoSave = false);
     void setWallpaperId(uint8_t id, bool autoSave = false);
     void setWallpaperPath(const char* path, bool autoSave = false);
+    void setTouchCal(uint16_t minX, uint16_t maxX, uint16_t minY, uint16_t maxY, bool autoSave = true);
     void set(const SystemConfig& cfg, bool autoSave = false);
 
 private:

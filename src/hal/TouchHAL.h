@@ -15,8 +15,8 @@
 #define TOUCH_HAL_H
 
 #include <Arduino.h>
-#include <SPI.h>
-#include <XPT2046_Touchscreen.h>
+
+class TFT_eSPI;
 
 namespace hal {
 
@@ -144,11 +144,13 @@ void setTouchRotation(uint8_t rotation);
 void calibrateTouchPoint(int16_t rawX, int16_t rawY, uint16_t &screenX, uint16_t &screenY);
 
 /**
- * @brief Direct reference to underlying XPT2046_Touchscreen driver instance.
+ * @brief Run interactive 4-point resistive touchscreen calibration UI,
+ *        apply the computed mapping, and persist it to NVS Config.
  *
- * @return Reference to XPT2046_Touchscreen
+ * @param tft Display instance
+ * @return true if calibration succeeded and was saved, false if cancelled/invalid
  */
-XPT2046_Touchscreen& getTouchDriver();
+bool runInteractiveCalibration(TFT_eSPI &tft);
 
 } // namespace hal
 
