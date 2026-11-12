@@ -191,5 +191,6 @@ function app_main()
 end
 
 -- Invoke entry point
+function onResume() paint.clearCanvas(); paint.drawToolbar() end
 app_main()
 )lua";

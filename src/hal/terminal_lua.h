@@ -201,5 +201,6 @@ function app_main()
 end
 
 -- Run application
+function onResume() ide.render() end
 app_main()
 )lua";

@@ -206,5 +206,6 @@ function app_main()
     end
 end
 
+function onResume() gallery.render() end
 app_main()
 )lua";

@@ -35,7 +35,7 @@ constexpr int32_t NAV_BAR_HEIGHT        = 26;  // Bottom nav bar height (y: 294.
 constexpr uint8_t  DEFAULT_BACKLIGHT     = 80;   // 80% default brightness
 constexpr uint32_t PWM_FREQUENCY        = 5000; // 5 kHz PWM frequency (inaudible, flicker-free)
 constexpr uint8_t  PWM_RESOLUTION_BITS   = 8;    // 8-bit resolution (0..255)
-constexpr uint8_t  PWM_CHANNEL           = 0;    // LEDC Channel 0 for Display Backlight
+constexpr uint8_t  PWM_CHANNEL           = 7;    // LEDC Channel 7 (Timer 3) isolated from Speaker Tone
 
 /**
  * @brief Initialize ST7789 display controller and hardware PWM backlight.
@@ -82,6 +82,16 @@ void turnBacklightOn();
  * @brief Turn backlight off (0% duty) without losing saved brightness setting.
  */
 void turnBacklightOff();
+
+/**
+ * @brief Put ST7789 panel into hardware display-off sleep without wiping GRAM.
+ */
+void sleepDisplayPanel();
+
+/**
+ * @brief Wake ST7789 panel from sleep and restore backlight PWM.
+ */
+void wakeDisplayPanel();
 
 /**
  * @brief Check if backlight is currently turned on.

@@ -4,6 +4,7 @@
  */
 
 #include "DisplayHAL.h"
+#include "core/Config.h"
 #include "core/Logger.h"
 #include <esp_arduino_version.h>
 
@@ -76,12 +77,25 @@ uint8_t getBacklight() {
 }
 
 void turnBacklightOn() {
-    uint8_t target = (s_lastNonZeroBacklight > 0) ? s_lastNonZeroBacklight : 100;
+    uint8_t cfgBright = Config::getInstance().getBrightness();
+    uint8_t target = (s_lastNonZeroBacklight >= 10) ? s_lastNonZeroBacklight : ((cfgBright >= 10) ? cfgBright : DEFAULT_BACKLIGHT);
     setBacklight(target);
 }
 
 void turnBacklightOff() {
     setBacklight(0);
+}
+
+void sleepDisplayPanel() {
+    turnBacklightOff();
+    s_tft.writecommand(0x28); // ST7789 DISPOFF (blanks LCD output while preserving GRAM)
+}
+
+void wakeDisplayPanel() {
+    s_tft.resetViewport();
+    s_tft.writecommand(0x11); // ST7789 SLPOUT
+    s_tft.writecommand(0x29); // ST7789 DISPON (re-enables LCD output from GRAM)
+    turnBacklightOn();
 }
 
 bool isBacklightOn() {

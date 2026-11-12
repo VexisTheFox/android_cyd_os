@@ -196,5 +196,6 @@ function app_main()
     end
 end
 
+function onResume() calc.drawFull() end
 app_main()
 )lua";

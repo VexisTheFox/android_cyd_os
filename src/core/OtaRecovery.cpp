@@ -573,8 +573,8 @@ void OtaRecovery::checkAndRunOnBoot() {
     }
 }
 
-static void parseSemVer(const char* tag, int &maj, int &min, int &pat) {
-    maj = 0; min = 0; pat = 0;
+static void parseSemVer(const char* tag, int &maj, int &min, int &pat, int &rev) {
+    maj = 0; min = 0; pat = 0; rev = 0;
     if (!tag) return;
     const char* p = tag;
     if (*p == 'v' || *p == 'V') p++;
@@ -585,6 +585,10 @@ static void parseSemVer(const char* tag, int &maj, int &min, int &pat) {
         const char* dot2 = strchr(dot1 + 1, '.');
         if (dot2) {
             pat = atoi(dot2 + 1);
+            const char* dot3 = strchr(dot2 + 1, '.');
+            if (dot3) {
+                rev = atoi(dot3 + 1);
+            }
         }
     }
 }
@@ -638,15 +642,16 @@ bool OtaRecovery::checkForUpdate(char* outLatestTag, size_t maxLen) {
         return false;
     }
 
-    int curMaj = 0, curMin = 0, curPat = 0;
-    int remMaj = 0, remMin = 0, remPat = 0;
-    parseSemVer(CYDOS_VERSION_TAG, curMaj, curMin, curPat);
-    parseSemVer(tagStr.c_str(), remMaj, remMin, remPat);
+    int curMaj = 0, curMin = 0, curPat = 0, curRev = 0;
+    int remMaj = 0, remMin = 0, remPat = 0, remRev = 0;
+    parseSemVer(CYDOS_VERSION_TAG, curMaj, curMin, curPat, curRev);
+    parseSemVer(tagStr.c_str(), remMaj, remMin, remPat, remRev);
 
     bool isNewer = false;
     if (remMaj > curMaj) isNewer = true;
     else if (remMaj == curMaj && remMin > curMin) isNewer = true;
     else if (remMaj == curMaj && remMin == curMin && remPat > curPat) isNewer = true;
+    else if (remMaj == curMaj && remMin == curMin && remPat == curPat && remRev > curRev) isNewer = true;
 
     if (isNewer) {
         if (outLatestTag && maxLen > 0) {

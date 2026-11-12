@@ -1,0 +1,253 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "cydOS (V1.0.2+) Complete AI & Human Lua Application Development & Play Store Guide",
+  "version": "1.0.2",
+  "os_info": {
+    "name": "cydOS",
+    "version": "v1.0.2",
+    "channel": "Stable Release",
+    "firmware_repository": "https://github.com/VexisTheFox/android_cyd_os",
+    "playstore_repository": "https://github.com/VexisTheFox/cydos_appstore",
+    "playstore_catalog_url": "https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/catalog.json"
+  },
+  "ai_prompt_instructions": {
+    "summary": "Give this JSON file to any AI assistant (ChatGPT, Claude, Gemini, etc.) or human developer to generate 100% compatible, zero-flicker Lua 5.4.6 apps for cydOS on the ESP32-2432S028 (Cheap Yellow Display).",
+    "mandatory_checklist_for_ai": [
+      "1. Always include the metadata header comments (-- @name, -- @author, -- @version, -- @category, -- @bg, -- @icon_b64, -- @orientation, -- @description) at the very top of the .lua file.",
+      "2. Keep all portrait drawing strictly inside the App Viewport: X = 0..239, Y = 20..293 (width = 240, height = 274). NEVER draw in Y < 20 (StatusBar) or Y >= 294 (NavBar).",
+      "3. If using Landscape mode (-- @orientation: landscape), keep all drawing strictly inside X = 0..319, Y = 20..213 (width = 320, height = 194).",
+      "4. Define a full-redraw function (e.g. `function renderFull() ... end`) AND register a global `function onResume() renderFull() end` so cydOS automatically redraws the app when waking from sleep or lock screen.",
+      "5. Inside the main `while true do` loop, ALWAYS call `sys.delay(16)` to `sys.delay(30)` so the OS touch router, StatusBar, NavBar (< Back / O Home), and sleep manager remain responsive.",
+      "6. Avoid full-screen `gui.fillRect(0, 20, 240, 274, bg)` on every frame! Draw the full screen once on startup and in `onResume()`, and only redraw dirty regions when touch or state changes.",
+      "7. Use `local` variables and avoid heavy per-frame table/string allocations to stay comfortably within the ESP32 SRAM heap budget (~90KB-150KB free)."
+    ]
+  },
+  "target_hardware": {
+    "device": "ESP32-2432S028 (Cheap Yellow Display / CYD 2-USB Type-C & Micro-USB)",
+    "mcu": "ESP32-D0WDQ6-V3 Dual-Core Xtensa LX6 @ 240 MHz, 520 KB SRAM, 4 MB SPI Flash",
+    "display": {
+      "controller": "ST7789 (55 MHz HSPI) / ILI9341 compatible",
+      "resolution_portrait": { "width": 240, "height": 320 },
+      "resolution_landscape": { "width": 320, "height": 240 },
+      "color_format": "16-bit RGB565 (0x0000..0xFFFF)",
+      "backlight": "Hardware PWM on GPIO 21 (LEDC Channel 7, 5 kHz, 10..100%)"
+    },
+    "touch": {
+      "controller": "XPT2046 Resistive Touch Digitizer (Software SPI)",
+      "filtering": "3-sample best-two average, pressure threshold, debounce, and coordinate calibration"
+    },
+    "peripherals": {
+      "rgb_led": "Active-LOW RGB LED (Red=GPIO 4, Green=GPIO 16, Blue=GPIO 17) via `sys.setLED(r, g, b)`",
+      "speaker": "Piezo buzzer on GPIO 26 (LEDC Channel 2) via `sys.beep(freq_hz, duration_ms)`",
+      "ldr": "Ambient Light Photoresistor on GPIO 34 (ADC1, 0..4095) via `sys.getLdr()`",
+      "boot_button": "Hardware Power / Sleep / Wake button on GPIO 0 (Short press = Sleep/Wake, Hold = Power Menu)",
+      "storage": "Internal LittleFS (`/apps/`) + MicroSD Card on VSPI (`/sd/`, `/sd/apps/`)"
+    }
+  },
+  "screen_layout": {
+    "portrait_default": {
+      "screen_width": 240,
+      "screen_height": 320,
+      "status_bar": { "x": 0, "y": 0, "w": 240, "h": 20, "note": "System owned (Clock, Version, Free RAM, Wi-Fi, SD/LFS, Battery)" },
+      "app_viewport": { "x": 0, "y": 20, "w": 240, "h": 274, "min_x": 0, "max_x": 239, "min_y": 20, "max_y": 293 },
+      "nav_bar": { "x": 0, "y": 294, "w": 240, "h": 26, "note": "System owned (< Back, O Home, [] App Manager)" }
+    },
+    "landscape_mode": {
+      "activation": "Add `-- @orientation: landscape` in header OR call `sys.setOrientation('landscape')`",
+      "screen_width": 320,
+      "screen_height": 240,
+      "status_bar": { "x": 0, "y": 0, "w": 320, "h": 20 },
+      "app_viewport": { "x": 0, "y": 20, "w": 320, "h": 194, "min_x": 0, "max_x": 319, "min_y": 20, "max_y": 213 },
+      "nav_bar": { "x": 0, "y": 214, "w": 320, "h": 26 }
+    }
+  },
+  "metadata_header_spec": {
+    "description": "Place these comments at the top of every `.lua` file (within the first 25 lines). Both the cydOS Home Launcher and Play Store parse them.",
+    "fields": {
+      "-- @name:": "Human-readable app title shown on Home Screen icon (max 14 chars recommended, e.g. `-- @name: Weather`)",
+      "-- @author:": "Developer or AI author name (e.g. `-- @author: VexisTheFox`)",
+      "-- @version:": "SemVer string (e.g. `-- @version: 1.0.0`)",
+      "-- @category:": "One of: `Internet`, `Games`, `Utilities`, `Media`",
+      "-- @bg:": "16-bit RGB565 hex background color for the 48x48 Home Screen icon tile (e.g. `-- @bg: 0x0276`)",
+      "-- @icon_b64:": "Optional Base64-encoded 16x16 icon bitmap (1-bit 32 bytes = 44 base64 chars, 2-bit 64 bytes = 88 chars, RGB332 256 bytes, or RGB565 512 bytes). Rendered at 2x scale (32x32) inside the Home Screen icon.",
+      "-- @orientation:": "`portrait` (default, 240x320) or `landscape` (320x240)",
+      "-- @description:": "One-line summary shown in Play Store and App Manager"
+    },
+    "example_header": [
+      "-- ===================================================================",
+      "-- @name: Cyber Notes",
+      "-- @author: VexisTheFox",
+      "-- @version: 1.0.0",
+      "-- @category: Utilities",
+      "-- @bg: 0x04D3",
+      "-- @icon_b64: //8AAIABAACAAQAAgAEAAIifAACAAQAAj58AAIABAACAAQAAj58AAIABAACAAQAAgAEAAIABAAD//wAA",
+      "-- @orientation: portrait",
+      "-- @description: Fast persistent notepad with landscape QWERTY keyboard",
+      "-- ==================================================================="
+    ]
+  },
+  "color_palette_rgb565": {
+    "formula": "((R5 << 11) | (G6 << 5) | B5) where R5=0..31, G6=0..63, B5=0..31",
+    "theme_constants": {
+      "BG_DARK": "0x0821",
+      "HEADER_NAVY": "0x10A2",
+      "CARD_SURFACE": "0x18E3",
+      "CARD_ELEVATED": "0x2124",
+      "BORDER_SLATE": "0x3186",
+      "BUTTON_NEUTRAL": "0x4208",
+      "TEXT_WHITE": "0xFFFF",
+      "TEXT_MUTED": "0x9CD3",
+      "ACCENT_CYAN": "0x07FF",
+      "ACCENT_GREEN": "0x07E0",
+      "ANDROID_GREEN": "0x3EE0",
+      "ACCENT_AMBER": "0xFFE0",
+      "ACCENT_ORANGE": "0xFD20",
+      "ACCENT_RED": "0xF800",
+      "ACCENT_MAGENTA": "0xF81F",
+      "ACCENT_BLUE": "0x04F5",
+      "BLACK": "0x0000"
+    }
+  },
+  "typography": {
+    "font_1": { "id": 1, "size_px": "6x8", "description": "Compact monospace font (38 chars per 240px row)" },
+    "font_2": { "id": 2, "size_px": "~8x16", "description": "Standard proportional UI font for titles, buttons, and cards" },
+    "font_4": { "id": 4, "size_px": "~14x26", "description": "Large bold numerals/headers for clocks, scores, and readouts" }
+  },
+  "lifecycle_and_wake_hooks": {
+    "execution_flow": "cydOS executes the `.lua` script from top to bottom inside a sandboxed Lua 5.4.6 VM with a 500-instruction watchdog/OS hook.",
+    "onResume_global_hook": {
+      "signature": "function onResume()",
+      "description": "CRITICAL FOR SLEEP/WAKE SUPPORT: Whenever the device wakes/unlocks from sleep or lock screen while your app is open, cydOS automatically invokes global `onResume()` (or `onRender()`, `render()`, `draw()`). Always define `function onResume() renderFull() end` in global scope so your UI is 100% redrawn after sleep/lock!"
+    },
+    "navigation_exit": "Pressing `<` (Back) or `O` (Home) on the bottom NavBar raises an internal abort signal that cleanly unwinds the Lua VM, frees all script memory, turns off the RGB LED, restores Portrait orientation, and returns to the Home Screen."
+  },
+  "lua_api_reference": {
+    "gui": {
+      "loaded": "Eagerly loaded in global `gui` table",
+      "functions": {
+        "gui.fillRect(x, y, w, h, color)": "Fill solid rectangle with 16-bit RGB565 color.",
+        "gui.drawRect(x, y, w, h, color)": "Draw 1px rectangle border.",
+        "gui.drawText(x, y, text, color [, font])": "Draw string at top-left (x, y) with transparent background. `font` is 1, 2 (default), or 4.",
+        "gui.drawLine(x1, y1, x2, y2, color)": "Draw 1px line between (x1, y1) and (x2, y2).",
+        "gui.drawFastHLine(x, y, w, color)": "Fast horizontal 1px line of width `w`.",
+        "gui.fillCircle(x, y, radius, color)": "Draw filled circle centered at (x, y).",
+        "gui.drawPixel(x, y, color)": "Draw single pixel at (x, y).",
+        "gui.drawImage(path, x, y [, maxW, maxH])": "Decode and render a `.bmp` (16/24/32-bit) or `.jpg`/`.jpeg` image from LittleFS or `/sd/`. Returns `ok (bool), width (int), height (int)`.",
+        "gui.drawBase64(b64_str, x, y [, fgColor, scale])": "Render a Base64-encoded 16x16 icon at top-left (x, y). `scale` defaults to 2 (32x32 px). Returns `ok (bool)`.",
+        "gui.createSampleImages()": "Generates sample BMP images in `/pictures` and `/sd/pictures`. Returns `count (int)`.",
+        "gui.keyboard([title, initialText])": "Opens the full-screen Landscape QWERTY Keyboard modal and returns the entered `string` on DONE, or `nil` on Cancel. IMPORTANT: Call your `renderFull()` immediately after `gui.keyboard()` returns to repaint your viewport!"
+      }
+    },
+    "input": {
+      "loaded": "Eagerly loaded in global `input` table",
+      "functions": {
+        "input.getTouch()": "Returns `x (int), y (int), pressed (bool)` in absolute screen coordinates (Portrait: X=0..239, Y=20..293; Landscape: X=0..319, Y=20..213)."
+      }
+    },
+    "sys": {
+      "loaded": "Eagerly loaded in global `sys` table",
+      "functions": {
+        "sys.delay(ms)": "Pauses script for `ms` milliseconds while pumping the OS UI shell, touch digitizer, and power button. MANDATORY in every loop.",
+        "sys.beep([freq_hz, duration_ms])": "Plays tone on speaker (default 1000 Hz, 20 ms) if system sound is enabled.",
+        "sys.getHeap()": "Returns free ESP32 heap memory in bytes (int).",
+        "sys.getLdr()": "Returns ambient light sensor ADC reading (0..4095).",
+        "sys.getUptime()": "Returns seconds since boot (int).",
+        "sys.getTime()": "Returns `formatted_hhmmss (string), hour (int), min (int), sec (int), synced (bool)`.",
+        "sys.syncNTP([wait_ms])": "Synchronizes system clock with NTP server over Wi-Fi. Returns `ok (bool), formatted_hhmmss (string)`.",
+        "sys.getRegion()": "Returns configured country/timezone summary string (e.g. `'Czechia (UTC+1)'`).",
+        "sys.getStorageTotal()": "Returns LittleFS total bytes (int).",
+        "sys.getStorageUsed()": "Returns LittleFS used bytes (int).",
+        "sys.isSDMounted()": "Returns `true` if MicroSD card is mounted.",
+        "sys.probeSD()": "Probes and mounts MicroSD card dynamically. Returns `bool`.",
+        "sys.setLED(r, g, b)": "Sets onboard RGB LED (0 = OFF, >0 = ON for each channel).",
+        "sys.setBrightness(percent)": "Sets LCD backlight brightness (10..100%).",
+        "sys.setOrientation(mode)": "Switches screen between `'portrait'` (240x320) and `'landscape'` (320x240).",
+        "sys.getOrientation()": "Returns `'portrait'` or `'landscape'`.",
+        "sys.getViewport()": "Returns `x, y, w, h` of active app viewport (`0, 20, 240, 274` in portrait; `0, 20, 320, 194` in landscape).",
+        "sys.getScreenSize()": "Returns `w, h` of entire screen (`240, 320` or `320, 240`).",
+        "sys.lockScreen([sleepDisplay])": "Locks screen (and sleeps display if `sleepDisplay == true`).",
+        "sys.installApp(sdPath)": "Copies `.lua` file from `/sd/...` into `/apps/` and registers it on Home Screen. Returns `ok (bool), destPath (string)`.",
+        "sys.launch(path)": "Exits current app and launches another `.lua` app at `path`.",
+        "sys.runScript(path)": "Executes another `.lua` file inline. Returns `ok (bool), err (string)`.",
+        "sys.log(level, tag, message)": "Writes timestamped entry to `/logs/kernel.log` (`level` = `'INFO'|'WARN'|'ERROR'|'FATAL'`).",
+        "sys.getKernelLog()": "Returns contents of `/logs/kernel.log`.",
+        "sys.clearKernelLog()": "Clears `/logs/kernel.log`.",
+        "sys.syncKernelLog()": "Copies `/logs/kernel.log` to `/sd/logs/kernel.log`.",
+        "sys.isDevMode()": "Returns `bool` whether Verbose Diagnostics mode is enabled."
+      }
+    },
+    "file": {
+      "loaded": "Lazy-loaded automatically on first access to `file.*`",
+      "functions": {
+        "file.list([dir_path])": "Lists files in `dir_path` (default `'/apps'`). Returns array of `{ path, name, size, isSD, isLua }`.",
+        "file.listImages([dir_path])": "Lists `.bmp`, `.jpg`, `.jpeg` files across `/pictures` and `/sd`.",
+        "file.read(path)": "Reads entire file as `string`, or `nil` on error.",
+        "file.write(path, content)": "Writes `content` string to `path` (creates parent dirs automatically). Returns `bool`.",
+        "file.remove(path)": "Deletes file at `path`. Returns `bool`.",
+        "file.exists(path)": "Returns `true` if file exists.",
+        "file.run(path)": "Alias for `sys.runScript(path)`."
+      }
+    },
+    "wifi": {
+      "loaded": "Lazy-loaded automatically on first access to `wifi.*`",
+      "functions": {
+        "wifi.isEnabled()": "Returns `true` if Wi-Fi radio is enabled.",
+        "wifi.setEnabled(enable)": "Enables or disables Wi-Fi station mode.",
+        "wifi.getStatus()": "Returns `'CONNECTED'`, `'CONNECTING'`, `'DISCONNECTED'`, or `'DISABLED'`.",
+        "wifi.getSSID()": "Returns connected or saved SSID string.",
+        "wifi.getIP()": "Returns IPv4 address string (e.g. `'192.168.1.42'`).",
+        "wifi.getRSSI()": "Returns signal strength in dBm (int).",
+        "wifi.getMac()": "Returns MAC address string.",
+        "wifi.connect([ssid, password, timeout_ms])": "Connects to Wi-Fi network. Returns `ok (bool), ip_or_status (string)`.",
+        "wifi.disconnect()": "Disconnects from Wi-Fi.",
+        "wifi.scan([max_results])": "Scans 2.4GHz networks and returns array of `{ ssid, rssi, open, channel }`."
+      }
+    },
+    "http": {
+      "loaded": "Lazy-loaded automatically on first access to `http.*`",
+      "functions": {
+        "http.get(url [, headers_tbl, timeout_ms])": "Performs HTTP/HTTPS GET (up to 16KB body). Returns `body (string|nil), status_code (int), err (string)`.",
+        "http.post(url, body [, content_type, headers_tbl])": "Performs HTTP/HTTPS POST. Returns `body (string|nil), status_code (int), err (string)`.",
+        "http.request(method, url [, body, headers_tbl, timeout_ms])": "Custom HTTP verb request. Returns `body, status_code, err`.",
+        "http.download(url, dest_path)": "Streams file of any size directly to LittleFS (`/apps/...`) or SD (`/sd/...`). Automatically registers `/apps/*.lua` on Home Screen. Returns `ok (bool), bytes_written (int), status_code (int)`."
+      }
+    },
+    "net": {
+      "loaded": "Lazy-loaded automatically on first access to `net.*`",
+      "functions": {
+        "net.ping(host [, port, timeout_ms])": "TCP reachability probe (default port 80 with fallback to 53). Returns `alive (bool), rtt_ms (int)`.",
+        "net.getTime()": "Returns `epoch, hhmmss_str, hour, min, sec, day, month, year`.",
+        "net.syncNTP([wait_ms])": "Alias for `sys.syncNTP`."
+      }
+    }
+  },
+  "play_store_publishing_guide": {
+    "repository_url": "https://github.com/VexisTheFox/cydos_appstore",
+    "directory_structure": {
+      "catalog.json": "Root manifest fetched by the cydOS Play Store app (`https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/catalog.json`)",
+      "ai_appdevelop.json": "This AI & Developer reference file at the root of `cydos_appstore`",
+      "apps/internet/<id>.lua": "Internet & cloud apps",
+      "apps/games/<id>.lua": "Touch games",
+      "apps/utilities/<id>.lua": "System utilities & productivity tools",
+      "apps/media/<id>.lua": "Audio, art, and photo apps"
+    },
+    "catalog_entry_schema": {
+      "id": "Short lowercase identifier without spaces (e.g. `weather`, `snake`, `notes`) — installed to `/apps/<id>.lua`",
+      "title": "Display title in Play Store & Home Screen (max 16 chars)",
+      "category": "One of: `Internet`, `Games`, `Utilities`, `Media`",
+      "badge": "Short 3-5 char uppercase badge (e.g. `NET`, `GAME`, `TOOL`, `MEDIA`)",
+      "version": "SemVer string (e.g. `1.0.0`)",
+      "author": "Creator handle",
+      "description": "Concise 1-line description (max 42 chars recommended for card layout)",
+      "path": "Relative path in repo (e.g. `apps/games/snake.lua`)",
+      "url": "Full raw GitHub URL (`https://raw.githubusercontent.com/VexisTheFox/cydos_appstore/main/apps/games/snake.lua`)",
+      "icon_bg": "Hex string for RGB565 icon tile background (e.g. `\"0x04D3\"`)",
+      "icon_b64": "44-character Base64 string encoding a 16x16 1-bit icon mask (32 bytes)"
+    },
+    "how_to_generate_icon_b64": "Create a 16x16 monochrome icon (1 bit per pixel, MSB first, 2 bytes per row = 32 bytes total) and Base64-encode those 32 bytes into a 44-character string. Place it in both `-- @icon_b64:` in the `.lua` header and `\"icon_b64\"` in `catalog.json`."
+  },
+  "complete_app_template": {
+    "description": "Copy-pasteable, production-ready cydOS Lua app template with sleep/wake `onResume()` redraw, header bar, touch buttons, and keyboard input.",
+    "code": "-- ===================================================================\n-- @name: Starter App\n-- @author: VexisTheFox\n-- @version: 1.0.0\n-- @category: Utilities\n-- @bg: 0x04D3\n-- @icon_b64: //8AAIABAACAAQAAgAEAAIifAACAAQAAj58AAIABAACAAQAAj58AAIABAACAAQAAgAEAAIABAAD//wAA\n-- @orientation: portrait\n-- @description: Template app with sleep/wake redraw and touch UI\n-- ===================================================================\n\nlocal VP_X, VP_Y, VP_W, VP_H = 0, 20, 240, 274\nlocal state = {\n    counter = 0,\n    note = \"Tap EDIT to type\",\n    pressedBtn = 0\n}\n\nlocal function drawCounterCard()\n    gui.fillRect(10, VP_Y + 34, 220, 86, 0x18E3)\n    gui.drawRect(10, VP_Y + 34, 220, 86, 0x3186)\n    gui.drawText(20, VP_Y + 42, \"COUNTER VALUE\", 0x07FF, 1)\n    gui.drawText(20, VP_Y + 58, tostring(state.counter), 0xFFFF, 4)\n    gui.drawText(20, VP_Y + 96, \"Note: \" .. state.note, 0x9CD3, 1)\nend\n\nlocal function drawButtons()\n    local bg1 = (state.pressedBtn == 1) and 0xFFFF or 0x04D3\n    local fg1 = (state.pressedBtn == 1) and 0x0000 or 0xFFFF\n    gui.fillRect(10, VP_Y + 132, 105, 42, bg1)\n    gui.drawRect(10, VP_Y + 132, 105, 42, 0x07E0)\n    gui.drawText(34, VP_Y + 145, \"+ COUNT\", fg1, 2)\n\n    local bg2 = (state.pressedBtn == 2) and 0xFFFF or 0x2124\n    local fg2 = (state.pressedBtn == 2) and 0x0000 or 0x07FF\n    gui.fillRect(125, VP_Y + 132, 105, 42, bg2)\n    gui.drawRect(125, VP_Y + 132, 105, 42, 0x07FF)\n    gui.drawText(148, VP_Y + 145, \"EDIT TXT\", fg2, 2)\nend\n\nlocal function renderFull()\n    gui.fillRect(VP_X, VP_Y, VP_W, VP_H, 0x0821)\n    gui.fillRect(VP_X, VP_Y, VP_W, 26, 0x10A2)\n    gui.drawFastHLine(VP_X, VP_Y + 26, VP_W, 0x07FF)\n    gui.drawText(10, VP_Y + 5, \"Starter App\", 0xFFFF, 2)\n    drawCounterCard()\n    drawButtons()\nend\n\n-- Mandatory global hook so cydOS redraws the app after sleep / lock screen\nfunction onResume()\n    renderFull()\nend\n\nlocal function main()\n    renderFull()\n    local wasPressed = false\n\n    while true do\n        local tx, ty, pressed = input.getTouch()\n        if pressed and not wasPressed then\n            wasPressed = true\n            if ty >= (VP_Y + 132) and ty <= (VP_Y + 174) then\n                if tx >= 10 and tx <= 115 then\n                    state.pressedBtn = 1\n                    state.counter = state.counter + 1\n                    sys.beep(1400, 15)\n                    drawButtons()\n                    drawCounterCard()\n                elseif tx >= 125 and tx <= 230 then\n                    state.pressedBtn = 2\n                    sys.beep(1200, 20)\n                    drawButtons()\n                    local res = gui.keyboard(\"Enter Note\", state.note)\n                    if res and #res > 0 then\n                        state.note = res\n                    end\n                    state.pressedBtn = 0\n                    renderFull()\n                end\n            end\n        elseif not pressed and wasPressed then\n            wasPressed = false\n            if state.pressedBtn ~= 0 then\n                state.pressedBtn = 0\n                drawButtons()\n            end\n        end\n        sys.delay(20)\n    end\nend\n\nmain()\n"
+  }
+}

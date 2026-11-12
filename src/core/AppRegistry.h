@@ -54,6 +54,7 @@ public:
     static bool isScriptRunning();
     /// Ask the running script to stop at the next hook/delay.
     static void requestAbort();
+    static void notifyScreenWake();
 };
 /**
  * @brief Registration entry descriptor.

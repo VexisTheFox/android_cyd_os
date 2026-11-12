@@ -330,5 +330,6 @@ function app_main()
     end
 end
 
+function onResume() sysinfo.render() end
 app_main()
 )lua";

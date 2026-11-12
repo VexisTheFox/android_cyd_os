@@ -170,6 +170,9 @@ void UIManager::finishBoot() {
 void UIManager::lockScreen(bool sleepDisplay) {
     if (s_state == UIState::BOOT_SPLASH) return;
 
+    s_powerMenuOpen = false;
+    s_updatePopupOpen = false;
+
     if (s_navBarInstance) {
         s_navBarInstance->clearPressedState();
     }
@@ -188,15 +191,16 @@ void UIManager::lockScreen(bool sleepDisplay) {
     s_pinEntry[0] = '\0';
     s_pinError = false;
 
+    hal::getDisplay().resetViewport();
+
     if (sleepDisplay) {
         s_screenAsleep = true;
         s_sleepEnterMs = millis();
-        hal::turnBacklightOff();
-        hal::getDisplay().fillScreen(TFT_BLACK);
-        LOG_INFO("POWER", "Screen OFF & Device Locked");
+        hal::sleepDisplayPanel();
+        LOG_INFO("POWER", "Screen OFF & Device Locked (GRAM preserved)");
     } else {
         s_screenAsleep = false;
-        hal::turnBacklightOn();
+        hal::wakeDisplayPanel();
         drawLockScreen(true);
         LOG_INFO("POWER", "Lock Screen displayed (PIN=%s)",
                  Config::getInstance().isPinEnabled() ? "ON" : "OFF");
@@ -208,12 +212,14 @@ void UIManager::unlockScreen() {
 
     s_isLocked = false;
     s_screenAsleep = false;
+    s_powerMenuOpen = false;
+    s_updatePopupOpen = false;
     s_pinLen = 0;
     s_pinEntry[0] = '\0';
     s_pinError = false;
     s_lastActivityMs = millis();
 
-    hal::turnBacklightOn();
+    hal::wakeDisplayPanel();
     if (s_lockedFromLandscape && s_state == UIState::ACTIVE_APP) {
         hal::setDisplayRotation(1);
         hal::setTouchRotation(1);
@@ -224,7 +230,18 @@ void UIManager::unlockScreen() {
     LOG_INFO("POWER", "Device Unlocked -> %s",
              (s_state == UIState::ACTIVE_APP) ? "ACTIVE_APP" : "HOME_LAUNCHER");
 
-    // Force full redraw of underlying app or Home Launcher
+    // If a blocking Lua script is running, notify it to redraw without clobbering VM state
+    if (s_state == UIState::ACTIVE_APP && core::DynamicScriptApp::isScriptRunning()) {
+        if (s_statusBarInstance) s_statusBarInstance->render(true);
+        if (s_navBarInstance) {
+            s_navBarInstance->clearPressedState();
+            s_navBarInstance->render(true);
+        }
+        core::DynamicScriptApp::notifyScreenWake();
+        return;
+    }
+
+    // Force full redraw of underlying C++ app or Home Launcher
     hal::getDisplay().fillScreen(TFT_BLACK);
     if (s_state == UIState::ACTIVE_APP && s_activeApp) {
         s_activeApp->onResume();
@@ -675,7 +692,11 @@ void UIManager::checkPowerAndSleep() {
         s_lastActivityMs = now;
         if (s_screenAsleep) {
             hal::beep(25);
-            lockScreen(false);
+            if (Config::getInstance().isPinEnabled()) {
+                lockScreen(false);
+            } else {
+                unlockScreen();
+            }
             return;
         }
         if (pwrEv == hal::PowerButtonEvent::LONG_PRESS && !s_isLocked) {
@@ -881,11 +902,15 @@ void UIManager::routeTouchEvents() {
 
     s_lastActivityMs = millis();
 
-    // If screen is asleep, touching the screen (after 450ms guard) wakes to Lock Screen
+    // If screen is asleep, touching the screen (after 450ms guard) wakes the display
     if (s_screenAsleep) {
         if (event.state == hal::TouchState::DOWN && (millis() - s_sleepEnterMs > 450)) {
             hal::beep(20);
-            lockScreen(false);
+            if (Config::getInstance().isPinEnabled()) {
+                lockScreen(false);
+            } else {
+                unlockScreen();
+            }
         }
         return;
     }
@@ -1213,6 +1238,9 @@ void UIManager::render(bool forceFullRedraw) {
             }
             if (s_powerMenuOpen || s_updatePopupOpen) break;
             if (s_activeApp) {
+                if (forceFullRedraw && !core::DynamicScriptApp::isScriptRunning()) {
+                    s_activeApp->onResume();
+                }
                 int16_t vpW = tft.width();
                 int16_t vpH = tft.height() - STATUS_BAR_HEIGHT - NAV_BAR_HEIGHT;
                 s_activeApp->onRender(tft, 0, VIEWPORT_Y, vpW, vpH);

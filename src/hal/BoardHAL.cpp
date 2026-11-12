@@ -46,7 +46,7 @@ void initBoard() {
     pinMode(CYD_SPEAKER, OUTPUT);
     digitalWrite(CYD_SPEAKER, LOW);
 
-#if defined(ESP_ARDUINO_VERSION_MAJOR) && (ESP_ARDUINO_VERSION_MAJOR >= 3)
+#if 1
     // Dedicate LEDC channel 1 for tones to avoid conflict with Backlight (channel 0)
     setToneChannel(SPEAKER_LEDC_CHANNEL);
 #endif
@@ -148,7 +148,7 @@ PowerButtonEvent pollPowerButtonEvent() {
             s_powerBtnFired = false;
         } else {
             uint32_t heldMs = now - s_powerBtnChangeMs;
-            if (!s_powerBtnFired && heldMs >= 35 && (now - s_powerBtnCooldownMs >= 250)) {
+            if (!s_powerBtnFired && heldMs >= 15 && (now - s_powerBtnCooldownMs >= 150)) {
                 s_powerBtnCooldownMs = now;
                 return PowerButtonEvent::SHORT_PRESS;
             }

@@ -479,5 +479,6 @@ function app_main()
     end
 end
 
+function onResume() files.render() end
 app_main()
 )lua";

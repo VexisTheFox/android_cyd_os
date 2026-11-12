@@ -120,7 +120,6 @@ void SettingsApp::onResume() {
     m_isDraggingSlider = false;
     m_isDraggingScroll = false;
     m_wasPressed       = false;
-    m_aboutScrollY     = 0;
     refreshCachedStatus();
     m_needsFullRedraw  = true;
 }
@@ -367,7 +366,7 @@ void SettingsApp::drawMainMenu(TFT_eSPI &display, int vx, int vy, int vw, int vh
         { "Region & Date/Time",  m_cachedRegionLine,              0x2C9F, "T" },
         { "System & Logs",       subSys,                          0x9175, "M" },
         { "OTA Update & Reset",  "Firmware Update & Reset",       0xD8A7, "U" },
-        { "About cydOS",         "Version 1.0.0.1 & Device Info", 0x04A0, "i" }
+        { "About cydOS",         "Version " CYDOS_VERSION_STR " & Device Info", 0x04A0, "i" }
     };
 
     const int rowH = 33;

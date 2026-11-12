@@ -42,7 +42,7 @@ namespace hal {
 #endif
 
 // Speaker Tone Constants
-constexpr uint8_t  SPEAKER_LEDC_CHANNEL   = 1;    // Channel 1 (Channel 0 reserved for Backlight)
+constexpr uint8_t  SPEAKER_LEDC_CHANNEL   = 2;    // Channel 2 (Timer 1, isolated from Backlight Channel 7)
 constexpr uint16_t BEEP_DEFAULT_FREQ      = 2400; // 2.4 kHz audible notification tone
 constexpr uint16_t BEEP_DEFAULT_DURATION  = 80;   // 80 ms default click/beep duration
 

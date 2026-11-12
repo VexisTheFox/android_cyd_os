@@ -34,8 +34,10 @@ extern "C" {
 
 namespace core {
 
-static volatile bool s_running   = false;
-static volatile bool s_abort     = false;
+static volatile bool s_running    = false;
+static volatile bool s_abort      = false;
+static volatile bool s_wakeRedraw = false;
+static lua_State*    s_activeL    = nullptr;
 static bool     s_touched = false;
 static uint16_t s_touchX  = 0;
 static uint16_t s_touchY  = 0;
@@ -52,12 +54,27 @@ static const char* OOM_TAG   = "out of memory (hard heap floor)";
         } \
     } while (0)
 
-bool DynamicScriptApp::isScriptRunning() { return s_running; }
-void DynamicScriptApp::requestAbort()    { s_abort = true; }
+bool DynamicScriptApp::isScriptRunning()  { return s_running; }
+void DynamicScriptApp::requestAbort()     { s_abort = true; }
+void DynamicScriptApp::notifyScreenWake() { s_wakeRedraw = true; }
 
 // ---------------------------------------------------------------- helpers
 static void pumpOS() {
     ui::UIManager::pump();
+    if (s_wakeRedraw && s_activeL && !s_abort) {
+        s_wakeRedraw = false;
+        const char* hooks[] = { "onResume", "onRender", "render", "draw" };
+        for (size_t i = 0; i < 4; i++) {
+            lua_getglobal(s_activeL, hooks[i]);
+            if (lua_isfunction(s_activeL, -1)) {
+                if (lua_pcall(s_activeL, 0, 0, 0) != LUA_OK) {
+                    lua_pop(s_activeL, 1);
+                }
+                break;
+            }
+            lua_pop(s_activeL, 1);
+        }
+    }
 }
 
 static void checkAbort(lua_State* L) {
@@ -1687,7 +1704,9 @@ void DynamicScriptApp::runScript() {
     lua_sethook(L, hookFn, LUA_MASKCOUNT, 500);
 
     s_abort = false;
+    s_wakeRedraw = false;
     s_running = true;
+    s_activeL = L;
 
     int rc = luaL_loadbuffer(L, src.c_str(), src.length(), m_path);
     // Immediately release script source String from heap before running script bytecode!
@@ -1719,6 +1738,8 @@ void DynamicScriptApp::runScript() {
         }
     }
     s_running = false;
+    s_activeL = nullptr;
+    s_wakeRedraw = false;
     lua_close(L);
 
     // After closing the Lua VM (which freed all script allocations), reclaim emergency reserve pool
